@@ -1789,4 +1789,4 @@ def list_admin_summaries():
 
 
 print("🚀 Flask 서버 시작 중...")
-app.run(debug=True, host='0.0.0.0', port=8080)
+app.run(debug=True, host='0.0.0.0', port=8040)
