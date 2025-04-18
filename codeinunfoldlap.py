@@ -64,20 +64,20 @@ except ImportError:
         @staticmethod
         def from_file(file, format): pass
         def export(self, out_f, format): pass
-try:
-    # 서비스 계정 키 파일 경로 (실제 경로로 변경!)
-    cred_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'parkyoun-9971d-firebase-adminsdk-fbsvc-a5c658338f.json') # <<< 실제 키 파일 경로!
-    if not os.path.exists(cred_path):
-        raise FileNotFoundError(f"Firebase Admin SDK 키 파일을 찾을 수 없습니다: {cred_path}")
-    cred = credentials.Certificate(cred_path)
-    # 앱 이름 중복 방지 (이미 초기화되었다면 건너뛰기)
-    if not firebase_admin._apps:
-         firebase_admin.initialize_app(cred)
-         print("✅ Firebase Admin SDK 초기화 성공")
-    else:
-         print("ℹ️ Firebase Admin SDK 이미 초기화됨.")
-except Exception as e:
-    print(f"🚨 Firebase Admin SDK 초기화 실패: {e}")
+# try:
+#     # 서비스 계정 키 파일 경로 (실제 경로로 변경!)
+#     cred_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'parkyoun-9971d-firebase-adminsdk-fbsvc-a5c658338f.json') # <<< 실제 키 파일 경로!
+#     if not os.path.exists(cred_path):
+#         raise FileNotFoundError(f"Firebase Admin SDK 키 파일을 찾을 수 없습니다: {cred_path}")
+#     cred = credentials.Certificate(cred_path)
+#     # 앱 이름 중복 방지 (이미 초기화되었다면 건너뛰기)
+#     if not firebase_admin._apps:
+#          firebase_admin.initialize_app(cred)
+#          print("✅ Firebase Admin SDK 초기화 성공")
+#     else:
+#          print("ℹ️ Firebase Admin SDK 이미 초기화됨.")
+# except Exception as e:
+#     print(f"🚨 Firebase Admin SDK 초기화 실패: {e}")
 # --- Google Cloud API 키 파일 경로 ---
 # !!! 중요: 실제 서비스 계정 키 JSON 파일의 전체 경로로 변경해주세요 !!!
 # 예: GOOGLE_API_KEY_PATH = "C:/Users/YourUser/Downloads/notional-buffer-445706-e0-b736090bdc8a.json"
