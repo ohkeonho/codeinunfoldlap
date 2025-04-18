@@ -84,7 +84,8 @@ from werkzeug.utils import secure_filename
 # 예: GOOGLE_API_KEY_PATH = "/home/youruser/keys/notional-buffer-445706-e0-b736090bdc8a.json"
 
 app = Flask(__name__)
-CORS(app)
+# CORS(app)
+print("Flask 실행중")
 # --- 설정 (Clova, Gemini) ---
 invoke_url = 'https://clovaspeech-gw.ncloud.com/external/v1/10943/01c19849854a8e51219a3e63a98d4a4565d71c73ee7566fdf84957a80c1897be'
 secret = '63d30b73e68b4defa3dc1815153985ba'
@@ -712,6 +713,7 @@ secret = '63d30b73e68b4defa3dc1815153985ba'
 # --- Flask 라우트 ---
 @app.route('/')
 def index_page():
+    print("index 실행증")
     """고소장 관련 페이지를 보여주는 라우트 함수"""
     # 고소장 관련 데이터 처리 로직 추가 가능
     return render_template('index.html')    
