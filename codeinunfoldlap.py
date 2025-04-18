@@ -90,35 +90,35 @@ invoke_url = 'https://clovaspeech-gw.ncloud.com/external/v1/10943/01c19849854a8e
 secret = '63d30b73e68b4defa3dc1815153985ba'
 
 # --- ✨ Gemini API 설정 수정 ✨ ---
-try:
-    # 실제 운영 환경에서는 환경 변수 사용을 강력히 권장합니다.
-    # 예: GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-    # 제공된 API 키를 직접 사용합니다. (테스트 목적)
-    GEMINI_API_KEY = "AIzaSyBF0F6T4t-Y-h0v6-RJJ8f9pe01B8c_6Og"
+# try:
+#     # 실제 운영 환경에서는 환경 변수 사용을 강력히 권장합니다.
+#     # 예: GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+#     # 제공된 API 키를 직접 사용합니다. (테스트 목적)
+#     GEMINI_API_KEY = "AIzaSyBF0F6T4t-Y-h0v6-RJJ8f9pe01B8c_6Og"
 
-    # API 키 변수가 비어있는지만 확인합니다.
-    if not GEMINI_API_KEY:
-        print("🚨 경고: GEMINI_API_KEY 가 설정되지 않았습니다. Gemini 요약 기능이 작동하지 않습니다.")
-        gemini_model = None
-    else:
-        # API 키가 존재하면 설정을 시도합니다.
-        print("✅ Gemini API 키를 사용하여 설정 시도 중...")
-        genai.configure(api_key=GEMINI_API_KEY)
-        # 사용할 모델 설정 (예: gemini-1.5-flash-latest)
-        gemini_model = genai.GenerativeModel('gemini-2.0-flash')
-        # 모델 이름 확인을 위한 로그 추가 (선택 사항)
-        # print(f"✅ Gemini API 설정 완료. 사용 모델: {gemini_model.model_name}")
-        print("✅ Gemini API 설정 완료.")
+#     # API 키 변수가 비어있는지만 확인합니다.
+#     if not GEMINI_API_KEY:
+#         print("🚨 경고: GEMINI_API_KEY 가 설정되지 않았습니다. Gemini 요약 기능이 작동하지 않습니다.")
+#         gemini_model = None
+#     else:
+#         # API 키가 존재하면 설정을 시도합니다.
+#         print("✅ Gemini API 키를 사용하여 설정 시도 중...")
+#         genai.configure(api_key=GEMINI_API_KEY)
+#         # 사용할 모델 설정 (예: gemini-1.5-flash-latest)
+#         gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+#         # 모델 이름 확인을 위한 로그 추가 (선택 사항)
+#         # print(f"✅ Gemini API 설정 완료. 사용 모델: {gemini_model.model_name}")
+#         print("✅ Gemini API 설정 완료.")
 
-except Exception as e:
-    print(f"🚨 Gemini API 설정 중 오류 발생: {e}")
-    # API 키 관련 흔한 오류 메시지 확인 및 안내
-    error_str = str(e).lower()
-    if "api key not valid" in error_str or "permission denied" in error_str or "authenticate" in error_str:
-         print("   👉 오류 상세: 제공된 API 키가 유효하지 않거나 필요한 권한이 없을 수 있습니다. 키를 확인해주세요.")
-    elif "quota" in error_str:
-         print("   👉 오류 상세: API 할당량을 초과했을 수 있습니다.")
-    gemini_model = None # 오류 발생 시 None으로 설정
+# except Exception as e:
+#     print(f"🚨 Gemini API 설정 중 오류 발생: {e}")
+#     # API 키 관련 흔한 오류 메시지 확인 및 안내
+#     error_str = str(e).lower()
+#     if "api key not valid" in error_str or "permission denied" in error_str or "authenticate" in error_str:
+#          print("   👉 오류 상세: 제공된 API 키가 유효하지 않거나 필요한 권한이 없을 수 있습니다. 키를 확인해주세요.")
+#     elif "quota" in error_str:
+#          print("   👉 오류 상세: API 할당량을 초과했을 수 있습니다.")
+#     gemini_model = None # 오류 발생 시 None으로 설정
 
 # --- ClovaSpeechClient 클래스 ---
 class ClovaSpeechClient:
