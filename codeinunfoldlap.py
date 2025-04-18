@@ -121,93 +121,93 @@ secret = '63d30b73e68b4defa3dc1815153985ba'
 #     gemini_model = None # 오류 발생 시 None으로 설정
 
 # --- ClovaSpeechClient 클래스 ---
-class ClovaSpeechClient:
-    def req_upload(self, file, completion, callback=None, userdata=None, forbiddens=None, boostings=None,
-                   wordAlignment=True, fullText=True, diarization=True, sed=None):
-        """
-        Clova Speech API에 음성 파일을 업로드하고 인식을 요청합니다.
-        파일 경로(str) 또는 Flask의 FileStorage 객체를 처리할 수 있습니다.
+# class ClovaSpeechClient:
+#     def req_upload(self, file, completion, callback=None, userdata=None, forbiddens=None, boostings=None,
+#                    wordAlignment=True, fullText=True, diarization=True, sed=None):
+#         """
+#         Clova Speech API에 음성 파일을 업로드하고 인식을 요청합니다.
+#         파일 경로(str) 또는 Flask의 FileStorage 객체를 처리할 수 있습니다.
 
-        :param file: 파일 경로(str) 또는 FileStorage 객체.
-        :param completion: 'sync' 또는 'async'.
-        :param ...: 기타 Clova API 파라미터.
-        :return: requests.Response 객체.
-        """
-        request_body = {
-            "language": "ko-KR",
-            "completion": completion,
-            "wordAlignment": wordAlignment,
-            "fullText": fullText,
-            # diarization 파라미터 구조에 주의: 'enable' 키 필요
-            "diarization": {"enable": diarization, "speakerCountMin": 2, "speakerCountMax": 2} # 필요시 speakerCount 조절
-        }
-        # print("=== [보내는 Clova JSON params] ===") # 필요시 주석 해제
-        # print(json.dumps(request_body, ensure_ascii=False, indent=2))
+#         :param file: 파일 경로(str) 또는 FileStorage 객체.
+#         :param completion: 'sync' 또는 'async'.
+#         :param ...: 기타 Clova API 파라미터.
+#         :return: requests.Response 객체.
+#         """
+#         request_body = {
+#             "language": "ko-KR",
+#             "completion": completion,
+#             "wordAlignment": wordAlignment,
+#             "fullText": fullText,
+#             # diarization 파라미터 구조에 주의: 'enable' 키 필요
+#             "diarization": {"enable": diarization, "speakerCountMin": 2, "speakerCountMax": 2} # 필요시 speakerCount 조절
+#         }
+#         # print("=== [보내는 Clova JSON params] ===") # 필요시 주석 해제
+#         # print(json.dumps(request_body, ensure_ascii=False, indent=2))
 
-        # --- 선택적 파라미터 추가 ---
-        if callback is not None: request_body['callback'] = callback
-        if userdata is not None: request_body['userdata'] = userdata
-        if forbiddens is not None: request_body['forbiddens'] = forbiddens
-        if boostings is not None: request_body['boostings'] = boostings
-        if sed is not None: request_body['sed'] = sed
+#         # --- 선택적 파라미터 추가 ---
+#         if callback is not None: request_body['callback'] = callback
+#         if userdata is not None: request_body['userdata'] = userdata
+#         if forbiddens is not None: request_body['forbiddens'] = forbiddens
+#         if boostings is not None: request_body['boostings'] = boostings
+#         if sed is not None: request_body['sed'] = sed
 
-        headers = {
-            'Accept': 'application/json;UTF-8',
-            'X-CLOVASPEECH-API-KEY': secret
-        }
+#         headers = {
+#             'Accept': 'application/json;UTF-8',
+#             'X-CLOVASPEECH-API-KEY': secret
+#         }
 
-        # --- 'file' 파라미터 타입에 따라 'media' 데이터 준비 ---
-        media_data_to_send = None
-        file_to_close = None # 직접 열었던 파일을 닫기 위해
+#         # --- 'file' 파라미터 타입에 따라 'media' 데이터 준비 ---
+#         media_data_to_send = None
+#         file_to_close = None # 직접 열었던 파일을 닫기 위해
 
-        try:
-            if isinstance(file, str):
-                # 타입 1: 파일 경로(문자열)인 경우 -> 파일을 직접 열기
-                print(f"DEBUG [ClovaClient]: 파일 경로에서 열기 시도: {file}")
-                # 파일을 열어서 requests에 전달, 나중에 닫아주어야 함
-                file_to_close = open(file, 'rb')
-                media_data_to_send = file_to_close
-            elif isinstance(file, FileStorage):
-                # 타입 2: FileStorage 객체인 경우 -> 필요한 정보 추출
-                print(f"DEBUG [ClovaClient]: FileStorage 객체 사용: {file.filename}")
-                # requests는 (파일명, 파일스트림, 컨텐츠타입) 튜플을 잘 처리함
-                media_data_to_send = (file.filename, file.stream, file.content_type)
-            # 필요한 경우 다른 타입 처리 추가 (예: io.BytesIO)
-            # elif isinstance(file, io.BytesIO):
-            #     print(f"DEBUG [ClovaClient]: BytesIO 객체 사용")
-            #     # BytesIO는 파일명이 없으므로, 임의의 파일명 지정 또는 전달 필요
-            #     filename = getattr(file, 'name', 'bytes_audio.bin') # name 속성이 있다면 사용
-            #     media_data_to_send = (filename, file, 'application/octet-stream') # 컨텐츠 타입 추정
-            else:
-                # 지원하지 않는 타입 처리
-                raise TypeError(f"지원하지 않는 파일 타입입니다: {type(file)}")
+#         try:
+#             if isinstance(file, str):
+#                 # 타입 1: 파일 경로(문자열)인 경우 -> 파일을 직접 열기
+#                 print(f"DEBUG [ClovaClient]: 파일 경로에서 열기 시도: {file}")
+#                 # 파일을 열어서 requests에 전달, 나중에 닫아주어야 함
+#                 file_to_close = open(file, 'rb')
+#                 media_data_to_send = file_to_close
+#             elif isinstance(file, FileStorage):
+#                 # 타입 2: FileStorage 객체인 경우 -> 필요한 정보 추출
+#                 print(f"DEBUG [ClovaClient]: FileStorage 객체 사용: {file.filename}")
+#                 # requests는 (파일명, 파일스트림, 컨텐츠타입) 튜플을 잘 처리함
+#                 media_data_to_send = (file.filename, file.stream, file.content_type)
+#             # 필요한 경우 다른 타입 처리 추가 (예: io.BytesIO)
+#             # elif isinstance(file, io.BytesIO):
+#             #     print(f"DEBUG [ClovaClient]: BytesIO 객체 사용")
+#             #     # BytesIO는 파일명이 없으므로, 임의의 파일명 지정 또는 전달 필요
+#             #     filename = getattr(file, 'name', 'bytes_audio.bin') # name 속성이 있다면 사용
+#             #     media_data_to_send = (filename, file, 'application/octet-stream') # 컨텐츠 타입 추정
+#             else:
+#                 # 지원하지 않는 타입 처리
+#                 raise TypeError(f"지원하지 않는 파일 타입입니다: {type(file)}")
 
-            # --- requests 라이브러리에 전달할 files 딕셔너리 구성 ---
-            files = {
-                'media': media_data_to_send,
-                # 'params'는 파일이 아니라 JSON 데이터를 보내므로 튜플 형태로 구성
-                'params': (None, json.dumps(request_body, ensure_ascii=False), 'application/json')
-            }
+#             # --- requests 라이브러리에 전달할 files 딕셔너리 구성 ---
+#             files = {
+#                 'media': media_data_to_send,
+#                 # 'params'는 파일이 아니라 JSON 데이터를 보내므로 튜플 형태로 구성
+#                 'params': (None, json.dumps(request_body, ensure_ascii=False), 'application/json')
+#             }
 
-            # --- API 요청 실행 ---
-            print(f"DEBUG [ClovaClient]: requests.post 호출 시작 (URL: {invoke_url + '/recognizer/upload'})")
-            response = requests.post(headers=headers, url=invoke_url + '/recognizer/upload', files=files)
-            print(f"DEBUG [ClovaClient]: requests.post 호출 완료 (Status: {response.status_code})")
+#             # --- API 요청 실행 ---
+#             print(f"DEBUG [ClovaClient]: requests.post 호출 시작 (URL: {invoke_url + '/recognizer/upload'})")
+#             response = requests.post(headers=headers, url=invoke_url + '/recognizer/upload', files=files)
+#             print(f"DEBUG [ClovaClient]: requests.post 호출 완료 (Status: {response.status_code})")
 
-        except Exception as e:
-             print(f"🚨 ERROR [ClovaClient]: API 요청 중 오류 발생: {e}")
-             # 오류 발생 시에도 파일 닫기 시도
-             raise e # 오류를 다시 발생시켜 상위에서 처리하도록 함
-        finally:
-            # --- 파일을 직접 열었다면 반드시 닫아주기 ---
-            if file_to_close is not None:
-                try:
-                    print(f"DEBUG [ClovaClient]: 직접 열었던 파일 닫기: {getattr(file_to_close, 'name', 'N/A')}")
-                    file_to_close.close()
-                except Exception as e_close:
-                    print(f"🚨 WARNING [ClovaClient]: 파일 닫기 중 오류: {e_close}")
+#         except Exception as e:
+#              print(f"🚨 ERROR [ClovaClient]: API 요청 중 오류 발생: {e}")
+#              # 오류 발생 시에도 파일 닫기 시도
+#              raise e # 오류를 다시 발생시켜 상위에서 처리하도록 함
+#         finally:
+#             # --- 파일을 직접 열었다면 반드시 닫아주기 ---
+#             if file_to_close is not None:
+#                 try:
+#                     print(f"DEBUG [ClovaClient]: 직접 열었던 파일 닫기: {getattr(file_to_close, 'name', 'N/A')}")
+#                     file_to_close.close()
+#                 except Exception as e_close:
+#                     print(f"🚨 WARNING [ClovaClient]: 파일 닫기 중 오류: {e_close}")
 
-        return response
+#         return response
 
 
 
