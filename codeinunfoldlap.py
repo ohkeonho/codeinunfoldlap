@@ -14,29 +14,29 @@ from flask import Flask, request, jsonify
 from werkzeug.datastructures import FileStorage
 import tempfile
 from werkzeug.utils import secure_filename 
-try:
-    from google.cloud import vision
-    from google.api_core import exceptions as google_exceptions # Google API 오류 처리
-    # --- 중요: Google Cloud API 키 파일 경로 설정 ---
-    # 아래 'path/to/your/keyfile.json' 부분을 실제 키 파일 경로로 변경하거나
-    # GOOGLE_APPLICATION_CREDENTIALS 환경 변수를 설정해야 합니다.
-    # 예시: GOOGLE_API_KEY_PATH = r"C:\Users\user\keys\my-google-cloud-key.json"
-    GOOGLE_API_KEY_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'notional-buffer-445706-e0-b736090bdc8a.json') # <<< 실제 키 파일 경로로 꼭 수정하세요!!!
-    # ---------------------------------------------
-    VISION_AVAILABLE = True # 라이브러리 로드 성공 시 True
-    print("✅ google-cloud-vision 라이브러리 로드됨.")
-    # API 키 파일 존재 여부 미리 확인 (선택적)
-    if not os.path.exists(GOOGLE_API_KEY_PATH):
-         print(f"🚨 WARNING: Google Cloud API 키 파일을 찾을 수 없습니다: {GOOGLE_API_KEY_PATH}")
-         print(f"🚨 -> 경로가 올바르지 않으면 이미지 OCR 기능이 작동하지 않습니다.")
-         # 필요하다면 키 파일 없을 때 VISION_AVAILABLE = False 로 설정 가능
-except ImportError:
-    vision = None # 임시 정의 (NameError 방지용)
-    google_exceptions = None # 임시 정의
-    GOOGLE_API_KEY_PATH = None
-    VISION_AVAILABLE = False # 라이브러리 로드 실패 시 False
-    print("🚨 WARNING: google-cloud-vision 라이브러리가 설치되지 않았습니다. 이미지 OCR 처리를 할 수 없습니다.")
-    print("🚨 -> 해결 방법: 터미널에서 'pip install google-cloud-vision' 실행 및 Google Cloud 인증 설정을 완료하세요.")
+# try:
+#     from google.cloud import vision
+#     from google.api_core import exceptions as google_exceptions # Google API 오류 처리
+#     # --- 중요: Google Cloud API 키 파일 경로 설정 ---
+#     # 아래 'path/to/your/keyfile.json' 부분을 실제 키 파일 경로로 변경하거나
+#     # GOOGLE_APPLICATION_CREDENTIALS 환경 변수를 설정해야 합니다.
+#     # 예시: GOOGLE_API_KEY_PATH = r"C:\Users\user\keys\my-google-cloud-key.json"
+#     GOOGLE_API_KEY_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'notional-buffer-445706-e0-b736090bdc8a.json') # <<< 실제 키 파일 경로로 꼭 수정하세요!!!
+#     # ---------------------------------------------
+#     VISION_AVAILABLE = True # 라이브러리 로드 성공 시 True
+#     print("✅ google-cloud-vision 라이브러리 로드됨.")
+#     # API 키 파일 존재 여부 미리 확인 (선택적)
+#     if not os.path.exists(GOOGLE_API_KEY_PATH):
+#          print(f"🚨 WARNING: Google Cloud API 키 파일을 찾을 수 없습니다: {GOOGLE_API_KEY_PATH}")
+#          print(f"🚨 -> 경로가 올바르지 않으면 이미지 OCR 기능이 작동하지 않습니다.")
+#          # 필요하다면 키 파일 없을 때 VISION_AVAILABLE = False 로 설정 가능
+# except ImportError:
+#     vision = None # 임시 정의 (NameError 방지용)
+#     google_exceptions = None # 임시 정의
+#     GOOGLE_API_KEY_PATH = None
+#     VISION_AVAILABLE = False # 라이브러리 로드 실패 시 False
+#     print("🚨 WARNING: google-cloud-vision 라이브러리가 설치되지 않았습니다. 이미지 OCR 처리를 할 수 없습니다.")
+#     print("🚨 -> 해결 방법: 터미널에서 'pip install google-cloud-vision' 실행 및 Google Cloud 인증 설정을 완료하세요.")
 try:
     # pypdf 는 PyPDF2의 개선된 최신 버전입니다. 가능하면 pypdf를 사용하세요.
     # 설치: pip install pypdf
