@@ -469,53 +469,53 @@ secret = '63d30b73e68b4defa3dc1815153985ba'
 #     else: return f"오류: 지원하지 않는 파일 형식 ({file_extension})."
 
 
-@app.route("/api/logout", methods=['POST'])
-def logout_user():
-    """
-    사용자 로그아웃 처리 (Firebase 리프레시 토큰 무효화).
-    성공/실패 여부를 JSON으로 반환합니다.
-    프론트엔드에서 로그아웃 버튼 클릭 시 호출합니다.
-    """
-    uploader_uid = None
-    try:
-        # 1. 요청 헤더에서 ID 토큰 가져오기
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            print("🚨 /api/logout: 인증 토큰 없음.")
-            return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+# @app.route("/api/logout", methods=['POST'])
+# def logout_user():
+#     """
+#     사용자 로그아웃 처리 (Firebase 리프레시 토큰 무효화).
+#     성공/실패 여부를 JSON으로 반환합니다.
+#     프론트엔드에서 로그아웃 버튼 클릭 시 호출합니다.
+#     """
+#     uploader_uid = None
+#     try:
+#         # 1. 요청 헤더에서 ID 토큰 가져오기
+#         auth_header = request.headers.get('Authorization')
+#         if not auth_header or not auth_header.startswith('Bearer '):
+#             print("🚨 /api/logout: 인증 토큰 없음.")
+#             return jsonify({"error": "인증 토큰이 필요합니다."}), 401
 
-        id_token = auth_header.split('Bearer ')[1]
+#         id_token = auth_header.split('Bearer ')[1]
 
-        # 2. ID 토큰 검증하여 UID 얻기
-        try:
-            decoded_token = auth.verify_id_token(id_token)
-            uploader_uid = decoded_token['uid']
-            print(f"ℹ️ /api/logout 요청 사용자 UID: {uploader_uid}")
-        except Exception as auth_err:
-            # 토큰이 유효하지 않으면 무효화할 필요 없음 (이미 로그아웃 상태 간주 가능)
-            print(f"⚠️ /api/logout: 토큰 검증 실패 (이미 로그아웃 상태일 수 있음): {auth_err}")
-            # 여기서 401을 반환해도 되고, 성공(200 OK)으로 간주하고 클라이언트에서 signOut하게 할 수도 있음
-            # 여기서는 일단 성공으로 간주하여 클라이언트 signOut을 유도
-            return jsonify({"message": "토큰 검증 실패, 클라이언트에서 로그아웃 진행"}), 200
+#         # 2. ID 토큰 검증하여 UID 얻기
+#         try:
+#             decoded_token = auth.verify_id_token(id_token)
+#             uploader_uid = decoded_token['uid']
+#             print(f"ℹ️ /api/logout 요청 사용자 UID: {uploader_uid}")
+#         except Exception as auth_err:
+#             # 토큰이 유효하지 않으면 무효화할 필요 없음 (이미 로그아웃 상태 간주 가능)
+#             print(f"⚠️ /api/logout: 토큰 검증 실패 (이미 로그아웃 상태일 수 있음): {auth_err}")
+#             # 여기서 401을 반환해도 되고, 성공(200 OK)으로 간주하고 클라이언트에서 signOut하게 할 수도 있음
+#             # 여기서는 일단 성공으로 간주하여 클라이언트 signOut을 유도
+#             return jsonify({"message": "토큰 검증 실패, 클라이언트에서 로그아웃 진행"}), 200
 
-        # 3. 리프레시 토큰 무효화 (UID 사용)
-        try:
-            auth.revoke_refresh_tokens(uploader_uid)
-            print(f"✅ UID {uploader_uid} 의 리프레시 토큰 무효화 성공.")
-            return jsonify({"message": "성공적으로 로그아웃 처리되었습니다 (토큰 무효화)."}), 200
-        except Exception as revoke_err:
-            print(f"🚨 /api/logout: 리프레시 토큰 무효화 실패 (UID: {uploader_uid}): {revoke_err}")
-            traceback.print_exc()
-            # 무효화 실패 시에도 클라이언트에서는 로그아웃 처리를 할 수 있도록
-            # 오류를 반환하되 심각한 서버 오류(500)보다는 클라이언트 오류(400)나 성공(200)으로 처리할 수도 있음
-            return jsonify({"error": "로그아웃 처리 중 서버 오류 (토큰 무효화 실패)", "detail": str(revoke_err)}), 500
+#         # 3. 리프레시 토큰 무효화 (UID 사용)
+#         try:
+#             auth.revoke_refresh_tokens(uploader_uid)
+#             print(f"✅ UID {uploader_uid} 의 리프레시 토큰 무효화 성공.")
+#             return jsonify({"message": "성공적으로 로그아웃 처리되었습니다 (토큰 무효화)."}), 200
+#         except Exception as revoke_err:
+#             print(f"🚨 /api/logout: 리프레시 토큰 무효화 실패 (UID: {uploader_uid}): {revoke_err}")
+#             traceback.print_exc()
+#             # 무효화 실패 시에도 클라이언트에서는 로그아웃 처리를 할 수 있도록
+#             # 오류를 반환하되 심각한 서버 오류(500)보다는 클라이언트 오류(400)나 성공(200)으로 처리할 수도 있음
+#             return jsonify({"error": "로그아웃 처리 중 서버 오류 (토큰 무효화 실패)", "detail": str(revoke_err)}), 500
 
-    except Exception as e:
-        # 예상치 못한 오류 처리
-        print(f"🚨 /api/logout: 예외 발생: {e}")
-        traceback.print_exc()
-        return jsonify({"error": "로그아웃 처리 중 예기치 않은 오류 발생"}), 500
-# --- ▲▲▲ 로그아웃 API 엔드포인트 추가 ▲▲▲ ---
+#     except Exception as e:
+#         # 예상치 못한 오류 처리
+#         print(f"🚨 /api/logout: 예외 발생: {e}")
+#         traceback.print_exc()
+#         return jsonify({"error": "로그아웃 처리 중 예기치 않은 오류 발생"}), 500
+# # --- ▲▲▲ 로그아웃 API 엔드포인트 추가 ▲▲▲ ---
 
 
 # def find_previous_summary_content(name, phone, region):
