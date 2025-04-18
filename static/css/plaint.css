@@ -1,0 +1,28 @@
+/* static/css/plaint.css (정리 최종본) */
+
+/* === 이 파일은 plaint.html 페이지의 고유 콘텐츠 스타일만 정의 === */
+/* 레이아웃, 사이드바 등 공통 스타일은 style.css 에서 관리 */
+
+.complaint-document {
+    background-color: #fff; padding: 25px;
+    border: 1px solid #eee; border-radius: 5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-top: 20px;
+}
+#complaintView h3 { /* 문서 보기 제목 */
+    font-size: 1.5em; color: #333; margin-bottom: 20px;
+    padding-bottom: 10px; border-bottom: 1px solid #dee2e6;
+}
+.complaint-document h4 { /* 문서 내부 섹션 제목 */
+    font-size: 1.15em; margin-top: 25px; margin-bottom: 10px;
+    color: #111; padding-bottom: 5px; border-bottom: 1px dotted #ccc;
+}
+.complaint-document h4:first-of-type { margin-top: 0; }
+.complaint-document p { margin-bottom: 12px; line-height: 1.7; color: #444; white-space: pre-line; }
+.complaint-document strong { color: #000; }
+.complaint-document ul { list-style: none; padding-left: 10px; margin-bottom: 15px; }
+.complaint-document ul li { margin-bottom: 8px; color: #444; }
+.complaint-document .indented { margin-left: 20px; padding-left: 15px; border-left: 2px solid #eee; }
+.complaint-document .signature { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: right; font-size: 0.95em; color: #555; }
+
+/* --- 레이아웃 관련 모든 중복 스타일 제거됨 --- */
+

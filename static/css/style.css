@@ -1,0 +1,345 @@
+/* static/css/style.css (호버 확장 문제 해결 최종 버전) */
+
+/* --- Google Font Import --- */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+/* --- Base Styles & Resets --- */
+:root {
+    /* 색상 및 스타일 변수 */
+    --primary-bg: #ffffff;
+    --secondary-bg: #f8f9fa;
+    --sidebar-bg: var(--secondary-bg);
+    --sidebar-text-color: #3c4043;
+    --sidebar-icon-color: #5f6368;
+    --sidebar-hover-bg: #e8eaed;
+    --sidebar-active-bg: #e8f0fe;
+    --sidebar-active-text: #1967d2;
+    --text-primary: #202124;
+    --text-secondary: #5f6368;
+    --border-color: #dadce0;
+    --accent-color: #1a73e8;
+    --accent-hover-color: #185abc;
+    --link-color: #1a73e8;
+    --danger-color: #d93025;
+    --success-color: #1e8e3e;
+    --warning-bg: #fef7e0;
+    --warning-text: #795500;
+    --shadow-soft: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+    --shadow-medium: 0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
+    --border-radius: 8px;
+    --sidebar-width-collapsed: 72px;
+    --sidebar-width-expanded: 256px;
+    --icon-highlight-size: 40px; /* 아이콘 하이라이트 크기 */
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Noto Sans KR', 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--secondary-bg); color: var(--text-primary);
+    line-height: 1.5; font-size: 14px;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}
+a { color: var(--link-color); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* --- Main Layout --- */
+.admin-container { display: flex; min-height: 100vh; }
+
+/* --- Sidebar Styles --- */
+.sidebar {
+    width: var(--sidebar-width-collapsed); background-color: var(--sidebar-bg);
+    padding: 8px 0; flex-shrink: 0; overflow-x: hidden; overflow-y: auto;
+    transition: width 0.2s ease-in-out, padding 0.2s ease-in-out;
+    position: fixed; left: 0; top: 0; height: 100%;
+    border-right: 1px solid var(--border-color); z-index: 1000;
+    display: flex; flex-direction: column;
+}
+/* JS 클래스 기반 확장 (고정 또는 호버 시) */
+.sidebar.sidebar-fixed-expanded,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover {
+    width: var(--sidebar-width-expanded);
+    padding: 8px;
+}
+
+/* static/css/style.css */
+
+/* --- Sidebar Styles --- */
+.sidebar {
+    width: var(--sidebar-width-collapsed); /* <<< 기본 상태: 접힌 너비 */
+    /* ... */
+    transition: width 0.2s ease-in-out, padding 0.2s ease-in-out;
+    /* ... */
+}
+
+/* JS 클래스 기반 확장 (고정 또는 호버 시) */
+.sidebar.sidebar-fixed-expanded,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover {
+    width: var(--sidebar-width-expanded); /* <<< 확장 상태: 펼친 너비 */
+    padding: 8px;
+}
+
+/* ... (펼쳐진 상태 내부 요소 스타일 규칙들) ... */
+
+/* --- Content Area --- */
+.content {
+    flex-grow: 1;
+    padding: 24px 32px;
+    background-color: var(--primary-bg);
+    /* ▼ 기본 마진 */
+    margin-left: var(--sidebar-width-collapsed);
+    /* ▼ 마진 변경 애니메이션 */
+    transition: margin-left 0.2s ease-in-out;
+    overflow-y: auto;
+    min-height: 100vh;
+}
+
+
+/* ▼▼▼ 핵심: 고정 확장 또는 호버 확장 시 콘텐츠 마진 변경 ▼▼▼ */
+.admin-container.sidebar-fixed-expanded .content, /* 고정 시 */
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover + .content /* 호버 시 (고정 아닐때) */
+{
+    margin-left: var(--sidebar-width-expanded); /* <<< 이 값이 적용되어야 함 */
+}
+/* Sidebar Title (Optional) */
+
+.sidebar.sidebar-fixed-expanded h1,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover h1 {
+    padding: 0 16px; justify-content: flex-start;
+}
+.sidebar.sidebar-fixed-expanded h1 i,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover h1 i {
+     margin-right: 16px;
+}
+.sidebar.sidebar-fixed-expanded h1 .sidebar-text,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover h1 .sidebar-text {
+    opacity: 1;
+}
+
+
+/* Sidebar Navigation */
+.sidebar nav { flex-grow: 1; }
+.sidebar nav ul { list-style: none; padding: 0; }
+.sidebar nav ul li {
+    padding: 0 calc((var(--sidebar-width-collapsed) - var(--icon-highlight-size)) / 2);
+    margin: 4px 0; transition: padding 0.2s ease-in-out;
+}
+.sidebar.sidebar-fixed-expanded nav ul li,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover nav ul li {
+    padding: 0 8px;
+}
+
+/* Navigation Links - Base */
+.sidebar nav ul li a {
+    display: flex; align-items: center; justify-content: center;
+    height: 40px; padding: 0; margin: 0;
+    color: var(--sidebar-text-color); text-decoration: none;
+    border-radius: 0; position: relative; overflow: hidden;
+    transition: background-color 0s, color 0.15s ease-in-out; /* 링크 자체 배경 전환 제거 */
+}
+/* 펼쳤을 때 링크 스타일 */
+.sidebar.sidebar-fixed-expanded nav ul li a,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover nav ul li a {
+    justify-content: flex-start; border-radius: 0 20px 20px 0; padding: 0 16px; height: 40px; width: auto;
+    /* 펼쳤을 때의 transition 은 아래 hover/active 에서 제어 */
+    transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out, border-radius 0s, justify-content 0.1s ease-in-out, padding 0.2s ease-in-out;
+}
+
+/* Navigation Icons - Base */
+.sidebar nav ul li a i {
+    color: var(--sidebar-icon-color); font-size: 1.3em;
+    width: var(--icon-highlight-size); height: var(--icon-highlight-size);
+    border-radius: 50%; margin: 0; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, margin-right 0.2s ease-in-out, width 0.2s ease-in-out, height 0.2s ease-in-out, border-radius 0.2s ease-in-out;
+    background-color: transparent;
+}
+/* 펼쳤을 때 아이콘 스타일 초기화 */
+.sidebar.sidebar-fixed-expanded nav ul li a i,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover nav ul li a i {
+    width: auto; height: auto; margin-right: 28px;
+    border-radius: 0; background-color: transparent !important;
+    color: var(--sidebar-icon-color);
+}
+
+/* Navigation Text */
+.sidebar nav ul li a .sidebar-text { opacity: 0; font-size: 0.95em; font-weight: 500; transition: opacity 0.1s ease-in-out; margin-left: 0; white-space: nowrap; overflow: hidden;}
+/* 펼쳤을 때 텍스트 보이기 */
+.sidebar.sidebar-fixed-expanded nav ul li a .sidebar-text,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover nav ul li a .sidebar-text {
+    opacity: 1;
+}
+
+/* --- Hover & Active States --- */
+
+/* 접혔을 때 아이콘(i)에 배경 적용 */
+.sidebar:not(.sidebar-fixed-expanded) nav ul li a:hover i { /* 호버 시 */
+    background-color: var(--sidebar-hover-bg);
+    color: var(--text-primary);
+}
+.sidebar:not(.sidebar-fixed-expanded) nav ul li a.active i { /* 활성 시 */
+    background-color: var(--sidebar-active-bg);
+    color: var(--sidebar-active-text);
+}
+/* 접혔을 때 링크(a) 자체 배경 투명 */
+.sidebar:not(.sidebar-fixed-expanded) nav ul li a:hover,
+.sidebar:not(.sidebar-fixed-expanded) nav ul li a.active {
+    background-color: transparent;
+}
+
+/* 펼쳤을 때 링크(a)에 배경 적용 */
+.sidebar.sidebar-fixed-expanded nav ul li a:hover,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover nav ul li a:hover {
+    background-color: var(--sidebar-hover-bg);
+    color: var(--text-primary);
+}
+.sidebar.sidebar-fixed-expanded nav ul li a.active,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover nav ul li a.active {
+    background-color: var(--sidebar-active-bg);
+    color: var(--sidebar-active-text);
+}
+/* 펼쳤을 때 활성/호버 시 아이콘 색상 조정 (배경은 위에서 초기화됨) */
+.sidebar:hover nav ul li a:hover i,
+.sidebar.sidebar-fixed-expanded nav ul li a:hover i {
+    color: var(--text-primary);
+}
+.sidebar:hover nav ul li a.active i,
+.sidebar.sidebar-fixed-expanded nav ul li a.active i {
+    color: var(--sidebar-active-text);
+}
+
+/* 활성 링크 왼쪽 파란 선 (펼쳤을 때만) */
+.sidebar nav ul li a.active::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; background-color: var(--sidebar-active-text); border-radius: 0 3px 3px 0; display: none; }
+.sidebar.sidebar-fixed-expanded nav ul li a.active::before,
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover nav ul li a.active::before {
+    display: block;
+}
+
+
+/* --- 하단 토글 버튼 --- */
+.sidebar-bottom-toggle { margin-top: auto; padding: 16px 0; display: flex; justify-content: center; border-top: 1px solid var(--border-color); transition: padding 0.2s ease-in-out; }
+.sidebar:hover .sidebar-bottom-toggle, .sidebar.sidebar-fixed-expanded .sidebar-bottom-toggle { padding: 16px; }
+#sidebarPinToggle { background: none; border: none; cursor: pointer; color: var(--sidebar-icon-color); font-size: 1.2em; padding: 8px; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out; }
+#sidebarPinToggle:hover { background-color: var(--sidebar-hover-bg); color: var(--text-primary); }
+.sidebar.sidebar-fixed-expanded #sidebarPinToggle { background-color: var(--sidebar-active-bg); color: var(--sidebar-active-text); }
+
+/* --- Content Area --- */
+/* static/css/style.css */
+
+/* --- Content Area --- */
+.content {
+    flex-grow: 1;
+    padding: 24px 32px;
+    background-color: var(--primary-bg);
+    /* ▼ 기본 마진: 접힌 사이드바 너비만큼 */
+    margin-left: var(--sidebar-width-collapsed);
+    /* ▼ 부드러운 마진 변경 효과 */
+    transition: margin-left 0.2s ease-in-out;
+    overflow-y: auto;
+    min-height: 100vh;
+}
+
+/* ▼▼▼ 핵심: 고정 확장 또는 호버 확장 시 콘텐츠 마진 변경 ▼▼▼ */
+.admin-container.sidebar-fixed-expanded .content, /* 고정 시 */
+.admin-container.sidebar-hover-enabled:not(.sidebar-fixed-expanded) .sidebar:hover + .content /* 호버 시 (고정 아닐때) */
+{
+    margin-left: var(--sidebar-width-expanded); /* 펼친 너비만큼 마진 */
+}
+/* ▲▲▲ --------------------------------------------- ▲▲▲ */
+
+/* --- Sidebar Toggle Button (상단 햄버거 - 모바일용) --- */
+.sidebar-toggle-btn { display: flex; position: fixed; top: 15px; left: 15px; z-index: 1100; background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 50%; width: 40px; height: 40px; font-size: 1.2em; cursor: pointer; color: var(--text-secondary); justify-content: center; align-items: center; box-shadow: var(--shadow-soft); transition: color 0.3s ease, background-color 0.3s ease; }
+.sidebar-toggle-btn:hover { color: var(--text-primary); background-color: var(--secondary-bg); }
+
+/* --- Component Styles --- */
+/* (카드, 테이블, 폼, 버튼 등은 이전 답변의 스타일 유지) */
+.content header { border-bottom: none; margin-bottom: 24px; padding-bottom: 0; display: flex; justify-content: space-between; align-items: center; }
+.content header h2 { font-size: 1.6em; font-weight: 500; color: var(--text-primary); display: flex; align-items: center; }
+.content header h2 i { margin-right: 12px; color: var(--text-secondary); font-size: 1.2em; }
+.user-profile-card, .content section.card-style { background-color: var(--primary-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 24px; margin-bottom: 24px; box-shadow: none; overflow: hidden; }
+.profile-header { display: flex; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color); }
+.profile-pic { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; margin-right: 16px; border: none; }
+.profile-info h4 { margin: 0 0 4px 0; font-size: 1.2em; font-weight: 500; color: var(--text-primary); }
+.profile-info p { margin: 0; color: var(--text-secondary); font-size: 0.9em; }
+.content section h3, .content section h4 { font-size: 1.15em; font-weight: 500; color: var(--text-primary); margin-bottom: 16px; padding-bottom: 0; border-bottom: none; }
+.content section.card-style h3 i { margin-right: 8px; color: var(--text-secondary); }
+table { width: 100%; border-collapse: collapse; margin-top: 16px; background-color: var(--primary-bg); border-radius: 0; overflow: visible; border: none; }
+th, td { padding: 12px 16px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--border-color); font-size: 0.9em; }
+th { background-color: var(--secondary-bg); font-weight: 500; color: var(--text-secondary); white-space: nowrap; border-top: 1px solid var(--border-color); }
+td { color: var(--text-primary); }
+td.summary-name { font-weight: normal; color: var(--text-primary); }
+tbody tr:last-child td { border-bottom: 1px solid var(--border-color); }
+tbody tr:hover { background-color: var(--sidebar-hover-bg); }
+tbody tr[data-storage-key] { cursor: pointer; }
+table button, table a.view-details { padding: 4px 8px; font-size: 0.85em; border-radius: 4px; cursor: pointer; background-color: transparent; color: var(--link-color); border: none; transition: background-color 0.2s; display: inline-flex; align-items: center; justify-content: center; }
+table button i { margin: 0; font-size: 1.1em; }
+table button:hover, table a.view-details:hover { background-color: var(--sidebar-hover-bg); text-decoration: none; }
+table button.admin-upload-btn { color: var(--text-secondary); }
+table button.admin-upload-btn:hover { color: var(--text-primary); }
+.summary-status, .status-pill { font-weight: 500; padding: 4px 10px; border-radius: 16px; font-size: 0.8em; text-align: center; display: inline-block; background-color: var(--warning-bg); color: var(--warning-text); border: 1px solid #fcefc9; }
+.status-pill.completed { background-color: #e6f4ea; color: #137333; border-color: #ceead6; }
+#uploadForm, #recordControls { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-top: 16px; }
+#uploadForm input[type="text"], #uploadForm input[type="tel"], #uploadForm input[type="file"], #recordControls input[type="text"], #recordControls input[type="tel"], #adminUploadModal select, #adminUploadModal input[type="file"] { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.95rem; flex-grow: 1; min-width: 180px; background-color: #fff; transition: border-color 0.2s ease, box-shadow 0.2s ease; height: 40px; }
+#adminUploadModal label { display: block; margin-bottom: 4px; font-weight: 500; color: var(--text-primary); font-size: 0.85em; margin-top: 12px; }
+#adminUploadModal label i { margin-right: 6px; color: var(--text-secondary); }
+#uploadForm input:focus, #adminUploadModal select:focus, #adminUploadModal input[type="file"]:focus { border-color: var(--accent-color); outline: 0; box-shadow: 0 0 0 1px var(--accent-color); }
+#uploadForm input[type="file"] { flex-grow: 2; }
+button, input[type="submit"] { padding: 0 16px; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: background-color 0.2s ease, box-shadow 0.1s ease; white-space: nowrap; height: 36px; line-height: 36px; }
+button:hover, input[type="submit"]:hover { background-color: var(--accent-hover-color); box-shadow: 0 1px 1px 0 rgba(0,0,0,.1); transform: none; }
+button:disabled, input[type="submit"]:disabled { background-color: #f1f3f4; color: #bdc1c6; cursor: not-allowed; transform: none; opacity: 1; box-shadow: none; }
+button.secondary, #stopRecording { background-color: var(--primary-bg); color: var(--link-color); border: 1px solid var(--border-color); }
+button.secondary:hover, #stopRecording:hover { background-color: #f8fafd; border-color: #d2e3fc; }
+.text-container, #detailPanelContent pre, .analysis-content { background-color: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 16px; margin-top: 10px; white-space: pre-wrap; word-wrap: break-word; max-height: 350px; overflow-y: auto; font-family: 'Roboto Mono', monospace; font-size: 0.85rem; line-height: 1.6; color: var(--text-primary); }
+#loadingIndicator, #errorIndicator, #adminUploadStatus { margin-top: 16px; padding: 12px 16px; border-radius: 4px; font-weight: 500; display: none; border: 1px solid transparent; text-align: left; font-size: 0.9em; }
+#loadingIndicator, .status-loading { color: #1a73e8; background-color: #e8f0fe; border-color: #d2e3fc; display: block; }
+#errorIndicator, .status-error { color: #d93025; background-color: #fce8e6; border-color: #f9c6c2; display: block; }
+#adminUploadStatus.status-success { color: #1e8e3e; background-color: #e6f4ea; border-color: #ceead6; display: block; }
+.modal-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(95,99,104,.8); z-index: 1040; opacity: 0; transition: opacity 0.15s linear; }
+.modal-backdrop.active { display: block; opacity: 1; }
+.detail-panel, .detail-panel-lookalike { display: none; position: fixed; z-index: 1050; background-color: var(--primary-bg); border-radius: var(--border-radius); box-shadow: var(--shadow-medium); overflow: hidden; transition: transform 0.2s ease-out, opacity 0.2s ease-out; opacity: 0; transform: translate(-50%, -48%) scale(0.95); top: 50%; left: 50%; width: 90%; max-width: 700px; max-height: 85vh; display: flex; flex-direction: column; }
+.detail-panel.active, .detail-panel-lookalike.active { display: flex; opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.panel-header { padding: 16px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.panel-header h3 { margin: 0; font-size: 1.2em; font-weight: 500; color: var(--text-primary); }
+.panel-header h3 i { margin-right: 10px; color: var(--text-secondary); }
+.panel-close-btn, .close-detail-btn { font-size: 1.6rem; color: var(--text-secondary); cursor: pointer; line-height: 1; padding: 4px; background: none; border: none; transition: color 0.2s; font-weight: 400; border-radius: 50%; }
+.panel-close-btn:hover, .close-detail-btn:hover { color: var(--text-primary); background-color: var(--sidebar-hover-bg);}
+.panel-content { padding: 24px; overflow-y: auto; flex-grow: 1; }
+.panel-content p:first-child { margin-top: 0; }
+#adminUploadModal .panel-content { display: flex; flex-direction: column; gap: 12px; }
+
+
+/* --- Responsive Design --- */
+@media (max-width: 768px) {
+    body { font-size: 13px; }
+    .sidebar { width: 0; padding: 0; transform: translateX(-100%); transition: transform 0.2s ease-in-out; position: fixed; height: 100%; top: 0; border-right: none; box-shadow: var(--shadow-medium); z-index: 1100; }
+    .admin-container.sidebar-expanded .sidebar { width: 280px; padding: 8px 0; transform: translateX(0); }
+    /* 모바일 호버 비활성화 */
+    .sidebar:hover { width: 0; padding: 0; }
+    .sidebar:hover .sidebar-text { opacity: 0; }
+    /* 모바일 호버 시 아이콘 스타일 유지 */
+    .sidebar:hover nav ul li { padding: 0 calc((var(--sidebar-width-collapsed) - var(--icon-highlight-size)) / 2); }
+    .sidebar:hover nav ul li a { justify-content: center; width: auto; height: 40px; padding: 0; border-radius: 0; margin: 4px 0; background-color: transparent; }
+    .sidebar:hover nav ul li a i { margin-right: 0; width: var(--icon-highlight-size); height: var(--icon-highlight-size); border-radius: 50%; background-color: transparent; color: var(--sidebar-icon-color); }
+    /* 모바일 활성 아이콘 원형 배경 유지 */
+    .sidebar nav ul li a.active i { background-color: var(--sidebar-active-bg); color: var(--sidebar-active-text); border-radius: 50%; }
+    .sidebar:hover nav ul li a.active i { background-color: var(--sidebar-active-bg); }
+    /* 모바일 활성 링크 왼쪽 선 숨김 */
+    .sidebar nav ul li a.active::before { display: none !important; }
+
+    .content { margin-left: 0; padding: 16px; transition: none; }
+    .admin-container.sidebar-expanded .content { margin-left: 0; }
+    .sidebar-toggle-btn { display: flex; }
+    .sidebar-bottom-toggle { display: none; } /* 모바일 하단 토글 숨김 */
+    .modal-backdrop.sidebar-open { display: block; opacity: 1; background-color: rgba(0,0,0,0.3); z-index: 1050; }
+    .content header h2 { font-size: 1.4em; }
+    #uploadForm, #recordControls { gap: 10px; }
+    #uploadForm input[type="file"] { flex-basis: 100%; }
+    table { display: block; overflow-x: auto; white-space: nowrap; border: none; }
+    th, td { white-space: nowrap; padding: 10px 12px; border: 1px solid var(--border-color); }
+    thead { display: table-header-group; } tbody { display: table-row-group; }
+    tr { display: table-row; } th, td { display: table-cell; }
+    .detail-panel, .detail-panel-lookalike { width: 95%; max-height: 90vh; }
+    .panel-header { padding: 12px 16px; } .panel-header h3 { font-size: 1.1em; }
+    .panel-content { padding: 16px; }
+}

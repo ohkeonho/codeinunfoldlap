@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>관리자 페이지 - 상담 목록</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/plaint.css') }}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+</head>
+<body>
+    <div class="admin-container">
+            <i class="fas fa-bars"></i>
+        </button>
+        <aside class="sidebar">
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('admin_page') }}" ><i class="fas fa-users"></i> <span class="sidebar-text">의뢰인</span></a></li>
+                    <li><a href="{{ url_for('plaint_page') }}"><i class="fas fa-file-alt"></i> <span class="sidebar-text">고소장</span></a></li>
+                    <li><a href="{{ url_for('supplementary_page') }}" ><i class="fas fa-file-medical-alt"></i> <span class="sidebar-text">보충이유서</span></a></li>
+                    <li><a href="{{ url_for('prosecutor_page') }}"class="active"><i class="fas fa-gavel"></i> <span class="sidebar-text">검찰의견서</span></a></li>
+                    <li><a href="{{ url_for('index_page') }}"><i class="fas fa-microphone-alt"></i> <span class="sidebar-text">음성처리 페이지</span></a></li>
+                </ul>
+                <div class="sidebar-bottom-toggle">
+                    <button id="sidebarPinToggle" title="사이드바 고정"><i class="fas fa-thumbtack"></i> 
+                    </button>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="content">
+            <header>
+                <h2 id="mainHeaderTitle"><i class="fas fa-list-alt"></i> 전체 상담 목록 (상세 분석 보기)</h2>
+            </header>
+
+            <section id="clientListView">
+                <div class="user-profile-card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>이름</th>
+                                <th>지역</th>
+                                <th>전화번호</th>
+                                <th>상담일</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody id="member-list-body">
+                            <tr><td colspan="6" style="text-align: center; padding: 20px;">상담 목록을 불러오는 중...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <div class="detail-panel" id="detailPanel">
+                <div class="panel-header">
+                    <h3 id="detailPanelTitle">상세 분석 정보</h3>
+                    <button id="panelCloseBtn" class="panel-close-btn" title="닫기">&times;</button>
+                </div>
+                <div class="panel-content" id="detailPanelContent">
+                    <p>목록에서 상세 분석이 완료된 행을 클릭하세요.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+
+    <template id="summary-row-template">
+        <tr class="member-row" style="cursor: pointer;">
+            <td class="summary-name"></td>
+            <td class="summary-region"></td>
+            <td class="summary-phone"></td>
+            <td class="summary-date"></td>
+            <td class="summary-status"></td>
+        </tr>
+    </template>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/prosecutor.js') }}"></script>
+</body>
+</html>

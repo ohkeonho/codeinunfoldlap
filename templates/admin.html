@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>관리자 페이지</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+</head>
+<body>
+    <div class="admin-container">
+        
+            <i class="fas fa-bars"></i>
+        </button>
+        <aside class="sidebar">
+
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('admin_page') }}" class="active"><i class="fas fa-users"></i> <span class="sidebar-text">의뢰인</span></a></li>
+                    <li><a href="{{ url_for('plaint_page') }}"><i class="fas fa-file-alt"></i> <span class="sidebar-text">고소장</span></a></li>
+                    <li><a href="{{ url_for('supplementary_page') }}"><i class="fas fa-file-medical-alt"></i> <span class="sidebar-text">보충이유서</span></a></li>
+                    <li><a href="{{ url_for('prosecutor_page') }}"><i class="fas fa-gavel"></i> <span class="sidebar-text">검찰의견서</span></a></li>
+                    <li><a href="{{ url_for('index_page') }}"><i class="fas fa-microphone-alt"></i> <span class="sidebar-text">음성처리 페이지</span></a></li>
+                    <li><a href="{{ url_for('login_page') }}"><i class="fas fa-sign-out-alt"></i> <span class="sidebar-text logout">로그아웃</span></a></li>
+
+                </ul>
+                <div class="sidebar-bottom-toggle">
+                    <button id="sidebarPinToggle" title="사이드바 고정"><i class="fas fa-thumbtack"></i> 
+                    </button>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="content">
+            <header>
+                <h2><i class="fas fa-tasks"></i> 회원 정보 및 상담 관리</h2>
+            </header>
+
+            <section>
+                <div class="user-profile-card">
+                    <div class="profile-header">
+                        <img src="{{ url_for('static', filename='images/default-profile.png') }}" alt="관리자 프로필" class="profile-pic" />
+                        <div class="profile-info">
+                            <h4>변호사</h4>
+                            <p>상담 내역 관리 및 분석</p>
+                        </div>
+                    </div>
+
+                    <h4><i class="fas fa-list"></i> 전체 상담 목록</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>이름</th>
+                                <th>지역</th>
+                                <th>전화번호</th>
+                                <th>상담일(파일명)</th>
+                                <th>상태</th>
+                                <th>상세 분석 업로드</th>
+                            </tr>
+                        </thead>
+                        <template id="member-row-template">
+                            <tr class="member-row" style="cursor: pointer;">
+                                <td class="summary-name"></td>
+                                <td class="summary-region"></td>
+                                <td class="summary-phone"></td>
+                                <td class="summary-date"></td>
+                                <td class="summary-status"></td>
+                                <td class="upload-cell" onclick="event.stopPropagation();">
+                                    <button class="admin-upload-btn" title="오디오 및 PDF 파일 업로드">
+                                        <i class="fas fa-upload"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        <tbody id="member-list-body">
+                            <tr><td colspan="7" style="text-align: center; padding: 20px;">상담 목록을 불러오는 중...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <div class="detail-panel" id="detailPanel">
+                <div class="panel-header">
+                    <h3 id="detailPanelTitle"><i class="fas fa-info-circle"></i> 상세 정보</h3>
+                     <button class="close-detail-btn" title="닫기">&times;</button>
+                </div>
+                <div class="panel-content" id="detailPanelContent">
+                    <p>목록에서 행을 클릭하면 요약 정보가 여기에 표시됩니다.</p>
+                </div>
+            </div>
+
+        </main>
+
+    </div>
+
+    <div id="adminUploadModal" class="modal detail-panel-lookalike">
+        <div class="panel-header">
+            <h3 id="modalUploadTitle"><i class="fas fa-cloud-upload-alt"></i> 상세 분석 파일 업로드</h3>
+            <button class="close-detail-btn" title="닫기" onclick="closeAdminModal()">&times;</button> </div>
+        <div class="panel-content">
+            <p><strong>대상:</strong> <span id="modalClientName"></span></p>
+            <input type="hidden" id="modalClientPhone">
+            <input type="hidden" id="modalClientRegion">
+
+            <label for="modalAudioFile"><i class="fas fa-volume-up"></i> 상담 녹음 파일 (Audio):</label>
+            <input type="file" id="modalAudioFile" accept="audio/*,.mp3,.wav,.m4a,.ogg" required>
+
+            <label for="modalDocumentFile"><i class="fas fa-file-alt"></i> 참고 문서 (PDF, 이미지):</label>
+            <input type="file" id="modalDocumentFile" name="referenceFiles" multiple accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.gif,.webp,.ico">
+
+            <label for="modalKeySelect"><i class="fas fa-key"></i> 주요 검토 사항:</label>
+            <select id="modalKeySelect" required>
+                <option value="" disabled selected>-- 키워드 선택 --</option>
+                <option value="고소장">고소장</option>
+                <option value="보충이유서">보충이유서</option>
+                <option value="검찰의견서">검찰의견서</option>
+            </select>
+
+            <button id="confirmUploadBtn"><i class="fas fa-check"></i> 업로드 및 분석 시작</button>
+            <div id="adminUploadStatus"></div> </div>
+    </div>
+
+
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+</body>
+</html>

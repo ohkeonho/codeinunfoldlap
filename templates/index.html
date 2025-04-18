@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>음성 파일 처리</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <style>
+        /* 이 페이지에만 적용될 추가 스타일이 있다면 여기에 작성 */
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+
+            <i class="fas fa-bars"></i>
+        </button>
+        <aside class="sidebar">
+            
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('admin_page') }}" ><i class="fas fa-users"></i> <span class="sidebar-text">의뢰인</span></a></li>
+                    <li><a href="{{ url_for('plaint_page') }}"><i class="fas fa-file-alt"></i> <span class="sidebar-text">고소장</span></a></li>
+                    <li><a href="{{ url_for('supplementary_page') }}"><i class="fas fa-file-medical-alt"></i> <span class="sidebar-text">보충이유서</span></a></li>
+                    <li><a href="{{ url_for('prosecutor_page') }}"><i class="fas fa-gavel"></i> <span class="sidebar-text">검찰의견서</span></a></li>
+                    <li><a href="{{ url_for('index_page') }}" class="active"><i class="fas fa-microphone-alt"></i> <span class="sidebar-text">음성처리 페이지</span></a></li>
+                </ul>
+                <div class="sidebar-bottom-toggle">
+                    <button id="sidebarPinToggle" title="사이드바 고정"><i class="fas fa-thumbtack"></i> 
+                    </button>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="content">
+            <header>
+                <h2><i class="fas fa-microphone-alt"></i> 음성 파일 업로드 및 녹음</h2>
+            </header>
+
+            <section class="upload-section card-style"> <h3><i class="fas fa-file-audio"></i> 음성 파일 업로드</h3>
+                <form id="uploadForm" enctype="multipart/form-data" novalidate>
+                    <input type="text" id="nameInputUpload" placeholder="이름 (필수)" required>
+                    <input type="tel" id="phoneInputUpload" placeholder="전화번호 (010-1234-5678)" required pattern="[0-9]{3}-[0-9]{4}-[0-9]{4}" title="전화번호 형식: 010-1234-5678 (필수)">
+                    <input type="text" id="regionInputUpload" placeholder="지역 (필수)" required>
+                    <input type="file" name="file" id="fileInput" accept="audio/*" required>
+                    <button type="submit">업로드 및 변환</button>
+                </form>
+            </section>
+
+            <section class="record-section card-style"> <h3><i class="fas fa-microphone"></i> 음성 녹음</h3>
+                <div id="recordControls">
+                    <input type="text" id="nameInputRecord" placeholder="이름 (필수)" required>
+                    <input type="tel" id="phoneInputRecord" placeholder="전화번호 (010-1234-5678)" required pattern="[0-9]{3}-[0-9]{4}-[0-9]{4}" title="전화번호 형식: 010-1234-5678 (필수)">
+                    <input type="text" id="regionInputRecord" placeholder="지역 (필수)" required>
+                    <button id="startRecording">녹음 시작</button>
+                    <button id="stopRecording" disabled>녹음 중지</button>
+                </div>
+            </section>
+
+            <div id="loadingIndicator">처리 중입니다...</div>
+            <div id="errorIndicator"></div>
+
+            <section id="resultsArea" class="results-section card-style" style="display: none;"> <h3><i class="fas fa-clipboard-list"></i> 변환 및 요약 결과</h3>
+                <h2>텍스트 변환 데이터<h2>
+                <div id="originalText" class="text-container"></div>
+
+                <h2>요약</h2>
+                <div id="geminiSummary" class="text-container"></div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

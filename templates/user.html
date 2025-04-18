@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관리자 페이지</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+</head>
+<body>
+  <div class="admin-container">
+      <i class="fas fa-bars"></i>
+    </button>
+    <aside class="sidebar">
+      
+      <nav>
+        <ul>
+          <li><a href="/index.html" class="active"><i class="fas fa-users"></i> <span class="sidebar-text">의뢰인</span></a></li>
+          <li><a href="/plaint/plaint.html"><i class="fas fa-briefcase"></i> <span class="sidebar-text">고소장</span></a></li>
+        </ul>
+        <div class="sidebar-bottom-toggle">
+          <button id="sidebarPinToggle" title="사이드바 고정"><i class="fas fa-thumbtack"></i> 
+          </button>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <header>
+        <h2><i class="fas fa-users"></i> 회원 정보</h2>
+      </header>
+
+      <section>
+        <div class="user-profile-card">
+          <div class="profile-header">
+            <img src="" alt="프로필 사진" class="profile-pic" />
+            <div class="profile-info">
+              <h4>박기태 변호사</h4>
+              <p>머문곳과 집단지성을 나누고있습니다</p>
+            </div>
+          </div>
+
+          <h4>전체 회원 목록</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>이름</th>
+                <th>지역</th>
+                <th>전화번호</th>
+                <th>상담일</th>
+                <th>상태</th>
+                <th>업로드</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-member-name="오건호" style="cursor: pointer;">
+                <td>오건호</td>
+                <td>서울시 은평구</td>
+                <td>010-1234-5678</td>
+                <td>2025-01-15</td>
+                <td>수임</td>
+                <td>
+                  <button onclick="uploadFile('오건호', event)" title="업로드">
+                    <i class="fas fa-upload"></i>
+                  </button>
+                </td>
+              </tr>
+              <tr data-member-name="박기태" style="cursor: pointer;">
+                <td>박기태</td>
+                <td>전라남도 광주</td>
+                <td>010-1234-5678</td>
+                <td>2025-02-20</td>
+                <td>수임</td>
+                <td>
+                  <button onclick="uploadFile('박기태', event)" title="업로드">
+                    <i class="fas fa-upload"></i>
+                  </button>
+                </td>
+              </tr>
+              <tr data-member-name="박천혁" style="cursor: pointer;">
+                <td>박천혁</td>
+                <td>대전시 동구</td>
+                <td>010-1234-5678</td>
+                <td>2025-03-10</td>
+                <td>대기</td>
+                <td>
+                  <button onclick="uploadFile('박천혁', event)" title="업로드">
+                    <i class="fas fa-upload"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="detail-panel" id="detailPanel">
+        <div class="panel-content">
+          
+        </div>
+      </div>
+
+    </main> 
+
+  </div>
+
+
+  <div class="modal-backdrop" id="modalBackdrop"></div>
+
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
