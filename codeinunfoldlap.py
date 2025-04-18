@@ -37,33 +37,33 @@ from werkzeug.utils import secure_filename
 #     VISION_AVAILABLE = False # 라이브러리 로드 실패 시 False
 #     print("🚨 WARNING: google-cloud-vision 라이브러리가 설치되지 않았습니다. 이미지 OCR 처리를 할 수 없습니다.")
 #     print("🚨 -> 해결 방법: 터미널에서 'pip install google-cloud-vision' 실행 및 Google Cloud 인증 설정을 완료하세요.")
-try:
-    # pypdf 는 PyPDF2의 개선된 최신 버전입니다. 가능하면 pypdf를 사용하세요.
-    # 설치: pip install pypdf
-    from pypdf import PdfReader
-    # 만약 구 버전 PyPDF2를 꼭 사용해야 한다면 아래 주석 해제하고 위 라인 주석 처리
-    # 설치: pip install pypdf2
-    # from PyPDF2 import PdfReader
-    PYPDF2_AVAILABLE = True # <<< 변수 정의
-    print("✅ PDF 처리 라이브러리 (pypdf/PyPDF2) 로드됨.")
-except ImportError:
-    PYPDF2_AVAILABLE = False # <<< 변수 정의
-    print("⚠️ 경고: PDF 처리 라이브러리(pypdf 또는 PyPDF2)를 찾을 수 없습니다. PDF 텍스트 추출이 비활성화됩니다.")
-    # PdfReader가 정의되지 않아 이후 코드에서 NameError 발생 방지 (선택적)
-    class PdfReader: pass # 임시 클래스 정의
-try:
-    from pydub import AudioSegment
-    PYDUB_AVAILABLE = True # pydub 임포트 성공 시 True로 설정
-    print("✅ pydub 라이브러리 로드됨.")
-except ImportError:
-    PYDUB_AVAILABLE = False # pydub 임포트 실패 시 False로 설정
-    print("🚨 WARNING: pydub 라이브러리가 설치되지 않았습니다. /record 경로 사용 시 오류가 발생할 수 있습니다.")
-    print("🚨 -> 해결 방법: 터미널에서 'pip install pydub' 실행 및 ffmpeg 설치 확인")
-    # pydub을 찾을 수 없을 때 AudioSegment를 임시 정의하여 다른 곳에서 NameError 방지
-    class AudioSegment:
-        @staticmethod
-        def from_file(file, format): pass
-        def export(self, out_f, format): pass
+# try:
+#     # pypdf 는 PyPDF2의 개선된 최신 버전입니다. 가능하면 pypdf를 사용하세요.
+#     # 설치: pip install pypdf
+#     from pypdf import PdfReader
+#     # 만약 구 버전 PyPDF2를 꼭 사용해야 한다면 아래 주석 해제하고 위 라인 주석 처리
+#     # 설치: pip install pypdf2
+#     # from PyPDF2 import PdfReader
+#     PYPDF2_AVAILABLE = True # <<< 변수 정의
+#     print("✅ PDF 처리 라이브러리 (pypdf/PyPDF2) 로드됨.")
+# except ImportError:
+#     PYPDF2_AVAILABLE = False # <<< 변수 정의
+#     print("⚠️ 경고: PDF 처리 라이브러리(pypdf 또는 PyPDF2)를 찾을 수 없습니다. PDF 텍스트 추출이 비활성화됩니다.")
+#     # PdfReader가 정의되지 않아 이후 코드에서 NameError 발생 방지 (선택적)
+#     class PdfReader: pass # 임시 클래스 정의
+# try:
+#     from pydub import AudioSegment
+#     PYDUB_AVAILABLE = True # pydub 임포트 성공 시 True로 설정
+#     print("✅ pydub 라이브러리 로드됨.")
+# except ImportError:
+#     PYDUB_AVAILABLE = False # pydub 임포트 실패 시 False로 설정
+#     print("🚨 WARNING: pydub 라이브러리가 설치되지 않았습니다. /record 경로 사용 시 오류가 발생할 수 있습니다.")
+#     print("🚨 -> 해결 방법: 터미널에서 'pip install pydub' 실행 및 ffmpeg 설치 확인")
+#     # pydub을 찾을 수 없을 때 AudioSegment를 임시 정의하여 다른 곳에서 NameError 방지
+#     class AudioSegment:
+#         @staticmethod
+#         def from_file(file, format): pass
+#         def export(self, out_f, format): pass
 # try:
 #     # 서비스 계정 키 파일 경로 (실제 경로로 변경!)
 #     cred_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'parkyoun-9971d-firebase-adminsdk-fbsvc-a5c658338f.json') # <<< 실제 키 파일 경로!
