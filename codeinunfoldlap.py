@@ -1837,4 +1837,4 @@ prosecutor_opinion_storage = {}
 
 
 print("🚀 Flask 서버 시작 중...")
-app.run(debug=False, host='0.0.0.0', port=8000)
+app.run(debug=False, host='0.0.0.0', port=5001)
