@@ -82,7 +82,7 @@ function initializeLoginForm() {
 
                 // 로그인 성공 후 메인 페이지로 이동 (예: 0.5초 후)
                 setTimeout(() => {
-                     window.location.href = '/'; // 메인 페이지 경로
+                     window.location.href = '/main'; // 메인 페이지 경로
                 }, 500);
                 // --- ▲▲▲ ID 토큰 방식: 로그인 성공 처리 ▲▲▲ ---
             })
