@@ -72,10 +72,12 @@
             <td class="summary-region"></td>
             <td class="summary-phone"></td>
             <td class="summary-date"></td>
-            <td class="summary-status"></td>
+            <td><div class="summary-status"></div></td>
         </tr>
     </template>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="{{ url_for('static', filename='js/prosecutor.js') }}"></script>
 </body>
 </html>

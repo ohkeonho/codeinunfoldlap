@@ -57,7 +57,7 @@
                 </div>
             </section>
 
-            <div id="loadingIndicator">처리 중입니다...</div>
+            <div id="loadingIndicator"></div>
             <div id="errorIndicator"></div>
 
             <section id="resultsArea" class="results-section card-style" style="display: none;"> <h3><i class="fas fa-clipboard-list"></i> 변환 및 요약 결과</h3>
@@ -71,9 +71,9 @@
         </main>
     </div>
 
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
