@@ -65,8 +65,62 @@ const escapeHtml = (unsafe) => {
 
 
 // === 관리자 페이지 주요 기능 함수 ===
+function setupSidebarInteractions() {
+    console.log("Setting up sidebar interactions...");
 
-// 관리자 목록 로드 함수
+    // --- 필요한 요소 가져오기 ---
+    const sidebar = document.querySelector('.sidebar');
+    const adminContainer = document.querySelector('.admin-container'); // <<< adminContainer를 함수 내에서 찾도록 수정
+    const thePinToggleButton = document.getElementById('sidebarPinToggle'); // HTML에 있는 실제 버튼 ID 사용
+    const pinIcon = thePinToggleButton?.querySelector('i'); // 버튼 안의 아이콘 찾기
+
+    // Check if all required elements exist
+    if (thePinToggleButton && pinIcon && sidebar && adminContainer) { // <<< 모든 요소가 있는지 확인
+        console.log("All elements found for sidebar interactions.");
+
+        // 페이지 로드 시 초기 상태 설정 (하나의 버튼 기준으로)
+        const isInitiallyFixed = sidebar.classList.contains('sidebar-fixed-expanded');
+        if (!isInitiallyFixed) { // 고정되지 않은 상태 (호버 활성화 상태)
+            adminContainer.classList.add('sidebar-hover-enabled');
+            pinIcon.className = 'fas fa-thumbtack'; // 압정 아이콘
+            thePinToggleButton.title = '사이드바 고정';
+        } else { // 고정된 상태 (호버 비활성화 상태)
+            adminContainer.classList.remove('sidebar-hover-enabled');
+            pinIcon.className = 'fas fa-anchor'; // 닻 아이콘
+            thePinToggleButton.title = '사이드바 호버 활성화';
+        }
+        console.log("Initial sidebar state setup complete. Fixed:", isInitiallyFixed, "Hover enabled:", !isInitiallyFixed);
+
+        // 단일 토글 버튼 클릭 이벤트 (모든 동작 통합)
+        thePinToggleButton.addEventListener('click', () => {
+            console.log("#sidebarPinToggle CLICKED!"); // 클릭 로그
+
+            // 클래스 토글 (사이드바 자체 & 컨테이너 동기화 & 호버 상태)
+            sidebar.classList.toggle('sidebar-fixed-expanded');
+            adminContainer.classList.toggle('sidebar-fixed-expanded'); // 컨테이너에도 고정 클래스 반영
+            adminContainer.classList.toggle('sidebar-hover-enabled'); // 호버 가능 상태 반전
+
+            // 아이콘 및 툴팁 업데이트 (클릭 *후*의 상태 기준)
+            const isNowFixed = sidebar.classList.contains('sidebar-fixed-expanded');
+            pinIcon.className = isNowFixed ? 'fas fa-anchor' : 'fas fa-thumbtack'; // 고정됨 -> 닻, 안됨 -> 압정
+            thePinToggleButton.title = isNowFixed ? '사이드바 호버 활성화' : '사이드바 고정';
+
+            // 상태 로그
+            console.log('Sidebar classes after click:', sidebar.classList.toString());
+            console.log('Admin container classes after click:', adminContainer.classList.toString());
+            console.log(`Pin toggled. New Fixed state: ${isNowFixed}, Hover enabled: ${adminContainer.classList.contains('sidebar-hover-enabled')}`);
+        });
+        console.log("Event listener attached to #sidebarPinToggle.");
+
+    } else {
+        // 어떤 요소가 없는지 구체적으로 경고
+        console.warn("Could not set up sidebar interactions: one or more required elements missing.");
+        if (!thePinToggleButton) console.warn("- Button with ID 'sidebarPinToggle' not found.");
+        if (!pinIcon) console.warn("- Icon element (i) inside '#sidebarPinToggle' not found.");
+        if (!sidebar) console.warn("- Element with class '.sidebar' not found.");
+        if (!adminContainer) console.warn("- Element with class '.admin-container' not found.");
+    }
+}
 async function loadSummaries() {
     const memberListBody = document.getElementById('member-list-body');
     const itemTemplate = document.getElementById('member-row-template');
@@ -101,11 +155,11 @@ async function loadSummaries() {
         });
 
         if (!response.ok) {
-            const text = await response.text();
-            let errorDetail = '';
-            try { const errJson = JSON.parse(text); errorDetail = errJson.error || errJson.detail || text;}
-            catch(e){ errorDetail = text || 'N/A'; }
-            throw new Error(`서버 오류 (${response.status}): ${errorDetail}`);
+             const text = await response.text();
+             let errorDetail = '';
+             try { const errJson = JSON.parse(text); errorDetail = errJson.error || errJson.detail || text;}
+             catch(e){ errorDetail = text || 'N/A'; }
+             throw new Error(`서버 오류 (${response.status}): ${errorDetail}`);
         }
         const summaries = await response.json().catch(err => { throw new Error("데이터 형식 오류"); });
 
@@ -117,94 +171,94 @@ async function loadSummaries() {
         console.log(`[Admin] Displaying ${summaries.length} summaries.`);
 
         summaries.forEach((summaryInfo, index) => {
-            // ... (Row 생성 및 셀 가져오기) ...
-            const clone = itemTemplate.content.cloneNode(true);
-            const tableRow = clone.querySelector('tr.member-row');
-            if (!tableRow) return;
-            const nameCell = clone.querySelector('.summary-name');
-            const regionCell = clone.querySelector('.summary-region');
-            const phoneCell = clone.querySelector('.summary-phone');
-            const dateCell = clone.querySelector('.summary-date');
-            const statusCell = clone.querySelector('.summary-status');
-            const adminUploadButton = clone.querySelector('.admin-upload-btn');
-            if (!nameCell || !regionCell || !phoneCell || !dateCell || !statusCell || !adminUploadButton) return;
+             // ... (Row 생성 및 셀 가져오기) ...
+             const clone = itemTemplate.content.cloneNode(true);
+             const tableRow = clone.querySelector('tr.member-row');
+             if (!tableRow) return;
+             const nameCell = clone.querySelector('.summary-name');
+             const regionCell = clone.querySelector('.summary-region');
+             const phoneCell = clone.querySelector('.summary-phone');
+             const dateCell = clone.querySelector('.summary-date');
+             const statusCell = clone.querySelector('.summary-status');
+             const adminUploadButton = clone.querySelector('.admin-upload-btn');
+             if (!nameCell || !regionCell || !phoneCell || !dateCell || !statusCell || !adminUploadButton) return;
 
-            // --- 셀 채우기 ---
-            const displayName = summaryInfo.name || 'N/A';
-            nameCell.textContent = displayName;
-            regionCell.textContent = summaryInfo.region || 'N/A';
-            phoneCell.textContent = summaryInfo.phone || 'N/A';
-            const fullDateValue = summaryInfo.date_created || summaryInfo.timestamp || 'N/A';
-            let displayDate = 'N/A';
-            if (typeof fullDateValue === 'string' && fullDateValue.length >= 10) displayDate = fullDateValue.substring(0, 10);
-            else displayDate = fullDateValue;
-            dateCell.textContent = displayDate;
-            let statusText = summaryInfo.status || '상태 미정'; let statusClass = 'status-unknown';
-            const source = summaryInfo.source || 'unknown';
-            if (summaryInfo.summary) statusText = "요약완료"; else statusText = "처리중";
-            // source 기반 상태/클래스 업데이트
-            if (source.includes('admin_upload_고소장')) { statusClass = 'status-admin status-complaint'; statusText = "고소장처리"; }
-            else if (source.includes('admin_upload_보충이유서')) { statusClass = 'status-admin status-supplementary'; statusText = "보충서처리"; }
-            else if (source.includes('admin_upload_검찰의견서')) { statusClass = 'status-admin status-prosecutor'; statusText = "검찰의견처리"; }
-            else if (source.includes('admin_upload')) { statusClass = 'status-admin status-etc'; statusText = "관리자처리"; }
-            else if (source.includes('upload')) { statusClass = 'status-upload'; }
-            else if (source.includes('record')) { statusClass = 'status-record'; }
-            statusCell.textContent = statusText; statusCell.className = `summary-status ${statusClass}`;
+             // --- 셀 채우기 ---
+             const displayName = summaryInfo.name || 'N/A';
+             nameCell.textContent = displayName;
+             regionCell.textContent = summaryInfo.region || 'N/A';
+             phoneCell.textContent = summaryInfo.phone || 'N/A';
+             const fullDateValue = summaryInfo.date_created || summaryInfo.timestamp || 'N/A';
+             let displayDate = 'N/A';
+             if (typeof fullDateValue === 'string' && fullDateValue.length >= 10) displayDate = fullDateValue.substring(0, 10);
+             else displayDate = fullDateValue;
+             dateCell.textContent = displayDate;
+             let statusText = summaryInfo.status || '상태 미정'; let statusClass = 'status-unknown';
+             const source = summaryInfo.source || 'unknown';
+             if (summaryInfo.summary) statusText = "요약완료"; else statusText = "처리중";
+             // source 기반 상태/클래스 업데이트
+             if (source.includes('admin_upload_고소장')) { statusClass = 'status-admin status-complaint'; statusText = "고소장처리"; }
+             else if (source.includes('admin_upload_보충이유서')) { statusClass = 'status-admin status-supplementary'; statusText = "보충서처리"; }
+             else if (source.includes('admin_upload_검찰의견서')) { statusClass = 'status-admin status-prosecutor'; statusText = "검찰의견처리"; }
+             else if (source.includes('admin_upload')) { statusClass = 'status-admin status-etc'; statusText = "관리자처리"; }
+             else if (source.includes('upload')) { statusClass = 'status-upload'; }
+             else if (source.includes('record')) { statusClass = 'status-record'; }
+             statusCell.textContent = statusText; statusCell.className = `summary-status ${statusClass}`;
 
-            // --- 데이터 저장 및 리스너 ---
-            const storageKey = summaryInfo.storage_key;
-            if (!storageKey) { tableRow.style.cursor='default'; }
-            else {
-                tableRow.dataset.storageKey = storageKey;
-                tableRow.dataset.name = displayName;
-                tableRow.dataset.phone = summaryInfo.phone || '';
-                tableRow.dataset.region = summaryInfo.region || '';
+             // --- 데이터 저장 및 리스너 ---
+             const storageKey = summaryInfo.storage_key;
+             if (!storageKey) { tableRow.style.cursor='default'; }
+             else {
+                 tableRow.dataset.storageKey = storageKey;
+                 tableRow.dataset.name = displayName;
+                 tableRow.dataset.phone = summaryInfo.phone || '';
+                 tableRow.dataset.region = summaryInfo.region || '';
 
-                // 업로드 버튼 리스너
-                adminUploadButton.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    openAdminModal(tableRow.dataset.name, tableRow.dataset.phone, tableRow.dataset.region);
-                });
+                 // 업로드 버튼 리스너
+                 adminUploadButton.addEventListener('click', (event) => {
+                     event.stopPropagation();
+                     openAdminModal(tableRow.dataset.name, tableRow.dataset.phone, tableRow.dataset.region);
+                 });
 
-                // 행 클릭 리스너 (상세보기)
-                tableRow.style.cursor = 'pointer';
-                tableRow.addEventListener('click', () => {
-                    const key = tableRow.dataset.storageKey;
-                    const currentName = tableRow.dataset.name || 'N/A';
-                    const currentPhone = tableRow.dataset.phone || 'N/A';
-                    if (!key) return;
-                    if (!currentAdminToken) { alert("인증 정보 만료. 다시 로그인해주세요."); return; }
+                 // 행 클릭 리스너 (상세보기)
+                 tableRow.style.cursor = 'pointer';
+                 tableRow.addEventListener('click', () => {
+                     const key = tableRow.dataset.storageKey;
+                     const currentName = tableRow.dataset.name || 'N/A';
+                     const currentPhone = tableRow.dataset.phone || 'N/A';
+                     if (!key) return;
+                     if (!currentAdminToken) { alert("인증 정보 만료. 다시 로그인해주세요."); return; }
 
-                    const detailPanel = document.getElementById('detailPanel');
-                    const detailPanelTitle = document.getElementById('detailPanelTitle');
-                    const detailPanelContent = document.getElementById('detailPanelContent');
-                    const backdrop = document.getElementById('modalBackdrop');
-                    const container = document.querySelector('.admin-container');
+                     const detailPanel = document.getElementById('detailPanel');
+                     const detailPanelTitle = document.getElementById('detailPanelTitle');
+                     const detailPanelContent = document.getElementById('detailPanelContent');
+                     const backdrop = document.getElementById('modalBackdrop');
+                     const container = document.querySelector('.admin-container');
 
-                    if (!detailPanel || !detailPanelTitle || !detailPanelContent || !backdrop || !container) return;
+                     if (!detailPanel || !detailPanelTitle || !detailPanelContent || !backdrop || !container) return;
 
-                    // 패널 열기 및 로딩
-                    detailPanelTitle.textContent = `<span class="math-inline">\{currentName\} \(</span>{currentPhone}) - 로딩 중...`;
-                    detailPanelContent.innerHTML = '<p style="text-align: center;">로딩 중...</p>';
-                    detailPanel.classList.add('active'); backdrop.classList.add('active');
-                    container.classList.add('detail-panel-active');
+                     // 패널 열기 및 로딩
+                     detailPanelTitle.textContent = `${currentName} (${currentPhone}) - 로딩 중...`;
+                     detailPanelContent.innerHTML = '<p style="text-align: center;">로딩 중...</p>';
+                     detailPanel.classList.add('active'); backdrop.classList.add('active');
+                     container.classList.add('detail-panel-active');
 
-                    // 상세 정보 API 호출 (토큰 포함)
-                    fetch(`/api/memory/${encodeURIComponent(key)}`, { headers: { 'Authorization': `Bearer ${currentAdminToken}` } })
-                        .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
-                        .then(data => {
-                            detailPanelTitle.textContent = `<span class="math-inline">\{currentName\} \(</span>{currentPhone}) - 요약 정보`;
-                            const summaryContent = data.summary || '[요약 내용 없음]';
-                            detailPanelContent.innerHTML = `<div style="white-space: pre-wrap; ; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;  height:720px; max-height: 100%; overflow-y: auto; line-height: 1.6;">${escapeHtml(summaryContent)}</div>`;
-                        })
-                        .catch(error => {
-                            console.error('[Admin] Error loading detail:', error);
-                            detailPanelTitle.textContent = `<span class="math-inline">\{currentName\} \(</span>{currentPhone}) - 오류`;
-                            detailPanelContent.innerHTML = `<p style="color: red;">오류: ${error.message}</p>`;
-                        });
-                }); // 행 클릭 리스너 끝
-            } // storageKey 있을 때 else 끝
-            memberListBody.appendChild(clone);
+                     // 상세 정보 API 호출 (토큰 포함)
+                     fetch(`/api/memory/${encodeURIComponent(key)}`, { headers: { 'Authorization': `Bearer ${currentAdminToken}` } })
+                         .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+                         .then(data => {
+                             detailPanelTitle.textContent = `${currentName} (${currentPhone}) - 요약 정보`;
+                             const summaryContent = data.summary || '[요약 내용 없음]';
+                             detailPanelContent.innerHTML = `<div style="white-space: pre-wrap; ; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;  height:720px; max-height: 100%; overflow-y: auto; line-height: 1.6; ">${escapeHtml(summaryContent)}</div>`;
+                         })
+                         .catch(error => {
+                             console.error('[Admin] Error loading detail:', error);
+                             detailPanelTitle.textContent = `${currentName} (${currentPhone}) - 오류`;
+                             detailPanelContent.innerHTML = `<p style="color: red;">오류: ${error.message}</p>`;
+                         });
+                 }); // 행 클릭 리스너 끝
+             } // storageKey 있을 때 else 끝
+             memberListBody.appendChild(clone);
         }); // forEach 끝
     } catch (error) {
         console.error('[Admin] Error loading summary list:', error);
@@ -214,83 +268,83 @@ async function loadSummaries() {
 
 // 관리자 업로드 모달 열기 (모달 dataset에 정보 저장)
 function openAdminModal(name, phone, region) {
-    const modal = document.getElementById('adminUploadModal');
-    const nameSpan = document.getElementById('modalClientName');
-    const keySelect = document.getElementById('modalKeySelect');
-    const audioInput = document.getElementById('modalAudioFile');
-    const docInput = document.getElementById('modalDocumentFile');
-    const statusDiv = document.getElementById('adminUploadStatus');
-    const confirmBtn = document.getElementById('confirmUploadBtn');
-    const backdrop = document.getElementById('modalBackdrop');
+     const modal = document.getElementById('adminUploadModal');
+     const nameSpan = document.getElementById('modalClientName');
+     const keySelect = document.getElementById('modalKeySelect');
+     const audioInput = document.getElementById('modalAudioFile');
+     const docInput = document.getElementById('modalDocumentFile');
+     const statusDiv = document.getElementById('adminUploadStatus');
+     const confirmBtn = document.getElementById('confirmUploadBtn');
+     const backdrop = document.getElementById('modalBackdrop');
 
-    if (!modal || !nameSpan || !keySelect || !audioInput || !docInput || !statusDiv || !confirmBtn || !backdrop) {
-        console.error("[Admin] Cannot open admin modal - required elements missing."); alert("모달 요소 오류"); return;
-    }
+     if (!modal || !nameSpan || !keySelect || !audioInput || !docInput || !statusDiv || !confirmBtn || !backdrop) {
+         console.error("[Admin] Cannot open admin modal - required elements missing."); alert("모달 요소 오류"); return;
+     }
 
-    // 모달 dataset에 정보 저장
-    modal.dataset.clientName = name || '';
-    modal.dataset.clientPhone = phone || '';
-    modal.dataset.clientRegion = region || '';
+     // 모달 dataset에 정보 저장
+     modal.dataset.clientName = name || '';
+     modal.dataset.clientPhone = phone || '';
+     modal.dataset.clientRegion = region || '';
 
-    // 표시 업데이트
-    nameSpan.textContent = name || 'N/A';
+     // 표시 업데이트
+     nameSpan.textContent = name || 'N/A';
 
-    // 폼 리셋
-    keySelect.selectedIndex = 0; audioInput.value = null; docInput.value = null;
-    statusDiv.textContent = ''; statusDiv.className = '';
-    confirmBtn.disabled = false; confirmBtn.textContent = '업로드 및 분석 시작';
+     // 폼 리셋
+     keySelect.selectedIndex = 0; audioInput.value = null; docInput.value = null;
+     statusDiv.textContent = ''; statusDiv.className = '';
+     confirmBtn.disabled = false; confirmBtn.textContent = '업로드 및 분석 시작';
 
-    modal.style.display = 'block'; backdrop.classList.add('active');
-}
+     modal.style.display = 'block'; backdrop.classList.add('active');
+ }
 
 // 상세 패널 닫기
 function closeDetailPanel() {
-    const panel = document.getElementById('detailPanel');
-    const backdrop = document.getElementById('modalBackdrop');
-    const container = document.querySelector('.admin-container'); // admin.html 용
-    if (panel) panel.classList.remove('active');
-    const adminModal = document.getElementById('adminUploadModal');
-    if (backdrop && (!adminModal || adminModal.style.display !== 'block')) backdrop.classList.remove('active');
-    if (container) container.classList.remove('detail-panel-active');
+     const panel = document.getElementById('detailPanel');
+     const backdrop = document.getElementById('modalBackdrop');
+     const container = document.querySelector('.admin-container'); // admin.html 용
+     if (panel) panel.classList.remove('active');
+     const adminModal = document.getElementById('adminUploadModal');
+     if (backdrop && (!adminModal || adminModal.style.display !== 'block')) backdrop.classList.remove('active');
+     if (container) container.classList.remove('detail-panel-active');
 }
 
 // 관리자 업로드 모달 닫기
 function closeAdminModal() {
-    const modal = document.getElementById('adminUploadModal');
-    const backdrop = document.getElementById('modalBackdrop');
-    if(modal) modal.style.display = 'none';
-    const detailPanel = document.getElementById('detailPanel');
-    if (backdrop && (!detailPanel || !detailPanel.classList.contains('active'))) backdrop.classList.remove('active');
-    if(modal) { delete modal.dataset.clientName; delete modal.dataset.clientPhone; delete modal.dataset.clientRegion; }
+     const modal = document.getElementById('adminUploadModal');
+     const backdrop = document.getElementById('modalBackdrop');
+     if(modal) modal.style.display = 'none';
+     const detailPanel = document.getElementById('detailPanel');
+     if (backdrop && (!detailPanel || !detailPanel.classList.contains('active'))) backdrop.classList.remove('active');
+     if(modal) { delete modal.dataset.clientName; delete modal.dataset.clientPhone; delete modal.dataset.clientRegion; }
 }
 
 // 관리자 업로드 처리 (모달 dataset 사용 및 프론트 유효성 검사)
 async function handleAdminUpload() {
-    // 요소 가져오기
-    const modal = document.getElementById('adminUploadModal');
-    const modalAudioFile = document.getElementById('modalAudioFile');
-    const modalDocumentFile = document.getElementById('modalDocumentFile');
-    const modalKeySelectInModal = document.getElementById('modalKeySelect');
-    const confirmUploadBtn = document.getElementById('confirmUploadBtn');
-    const adminUploadStatus = document.getElementById('adminUploadStatus');
+     // 요소 가져오기
+     const modal = document.getElementById('adminUploadModal');
+     const modalAudioFile = document.getElementById('modalAudioFile');
+     const modalDocumentFile = document.getElementById('modalDocumentFile');
+     const modalKeySelectInModal = document.getElementById('modalKeySelect');
+     const confirmUploadBtn = document.getElementById('confirmUploadBtn');
+     const adminUploadStatus = document.getElementById('adminUploadStatus');
 
-    if(!modal || !modalAudioFile || !modalDocumentFile || !modalKeySelectInModal || !confirmUploadBtn || !adminUploadStatus) {
-        alert("업로드 처리 오류 (필수 요소 누락)"); return;
-    }
+     if(!modal || !modalAudioFile || !modalDocumentFile || !modalKeySelectInModal || !confirmUploadBtn || !adminUploadStatus) {
+         alert("업로드 처리 오류 (필수 요소 누락)"); return;
+     }
 
-    // 값 읽기 (파일 + 모달 dataset)
-    const audioFile = modalAudioFile.files[0];
-    const documentFiles = modalDocumentFile.files;
-    const key = modalKeySelectInModal.value;
-    const name = modal.dataset.clientName;
-    const phone = modal.dataset.clientPhone;
-    const region = modal.dataset.clientRegion;
+     // 값 읽기 (파일 + 모달 dataset)
+     const audioFile = modalAudioFile.files[0];
+     const documentFiles = modalDocumentFile.files;
+     const key = modalKeySelectInModal.value;
+     const name = modal.dataset.clientName;
+     const phone = modal.dataset.clientPhone;
+     const region = modal.dataset.clientRegion;
 
-    // 프론트엔드 유효성 검사
-    let validationError = null;
-    if (!name) { validationError = '대상 의뢰인 이름 정보 없음'; }
-    else if (!phone) { validationError = '대상 의뢰인 연락처 정보 없음'; }
-    else if (!region) { validationError = '대상 의뢰인 지역 정보 없음'; }
+     // 프론트엔드 유효성 검사
+     let validationError = null;
+     if (!name) { validationError = '대상 의뢰인 이름 정보 없음'; }
+     else if (!phone) { validationError = '대상 의뢰인 연락처 정보 없음'; }
+     else if (!region) { validationError = '대상 의뢰인 지역 정보 없음'; }
      else if (!key) { validationError = '주요 검토 사항(키워드) 선택 필요'; modalKeySelectInModal?.focus(); }
      else if (!audioFile) { validationError = '오디오 파일 선택 필요'; modalAudioFile?.focus(); }
      else if (!documentFiles || documentFiles.length === 0) { validationError = '문서 파일 1개 이상 선택 필요'; modalDocumentFile?.focus(); }
@@ -342,49 +396,6 @@ async function handleAdminUpload() {
 // === DOM 로드 후 실행될 메인 로직 ===
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOMContentLoaded event fired. Initializing script...");
-    const sidebarPinToggle = document.getElementById('sidebarPinToggle');
-    const sidebar = document.querySelector('.sidebar');
-    if (sidebarPinToggle && sidebar) {
-        sidebarPinToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('sidebar-fixed-expanded');
-        });
-    } else {
-        console.warn("Sidebar pin toggle button or sidebar element not found.");
-    }
-    // --- 2. 하단 고정/호버 토글 버튼 이벤트 리스너 ---
-    if (sidebarPinToggleBtn && pinIcon) {
-
-        
-    // 초기 상태 설정 (호버 활성화)
-    // 페이지 로드 시 고정 상태가 아니면 호버 활성화
-    if (!sidebar.classList.contains('sidebar-fixed-expanded')) {
-        adminContainer.classList.add('sidebar-hover-enabled');
-        pinIcon.className = 'fas fa-thumbtack';
-        sidebarPinToggleBtn.title = '사이드바 고정';
-    } else { // 고정 상태면 호버 비활성화
-        adminContainer.classList.remove('sidebar-hover-enabled');
-        pinIcon.className = 'fas fa-anchor';
-        sidebarPinToggleBtn.title = '사이드바 호버 활성화';
-    }
-
-    // 클릭 이벤트
-    sidebarPinToggleBtn.addEventListener('click', () => {
-        const isFixed = sidebar.classList.contains('sidebar-fixed-expanded');
-        console.log('Pin toggle clicked. Currently fixed:', isFixed); // <<< 디버그 로그
-
-        sidebar.classList.toggle('sidebar-fixed-expanded');
-        adminContainer.classList.toggle('sidebar-fixed-expanded');
-        adminContainer.classList.toggle('sidebar-hover-enabled');
-
-        // 클래스 변경 후 상태 확인 로그
-        console.log('Sidebar classes:', sidebar.classList.toString());
-        console.log('Admin container classes:', adminContainer.classList.toString());
-
-        pinIcon.className = isFixed ? 'fas fa-thumbtack' : 'fas fa-anchor';
-        sidebarPinToggleBtn.title = isFixed ? '사이드바 고정' : '사이드바 호버 활성화';
-        console.log(`Sidebar pin toggled. New Fixed state: ${!isFixed}, Hover enabled: ${adminContainer.classList.contains('sidebar-hover-enabled')}`);
-    });
-}
     // Firebase 초기화
     try {
         if (typeof firebase !== 'undefined' && firebase.initializeApp) {
