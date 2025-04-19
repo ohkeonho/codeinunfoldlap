@@ -39,7 +39,7 @@
             <section>
                 <div class="user-profile-card">
                     <div class="profile-header">
-                        <img src="{{ url_for('static', filename='images/default-profile.png') }}" alt="관리자 프로필" class="profile-pic" />
+                        <img src="data:image/jpeg;base64,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" alt="관리자 프로필" class="profile-pic" />
                         <div class="profile-info">
                             <h4>변호사</h4>
                             <p>상담 내역 관리 및 분석</p>
@@ -64,13 +64,13 @@
                                 <td class="summary-region"></td>
                                 <td class="summary-phone"></td>
                                 <td class="summary-date"></td>
-                                <td class="summary-status"></td>
+                                <td><div class="summary-status"></div></td>
                                 <td class="upload-cell" onclick="event.stopPropagation();">
                                     <button class="admin-upload-btn" title="오디오 및 PDF 파일 업로드">
                                         <i class="fas fa-upload"></i>
                                     </button>
                                 </td>
-                            </tr>
+                                </tr>
                         </template>
                         <tbody id="member-list-body">
                             <tr><td colspan="7" style="text-align: center; padding: 20px;">상담 목록을 불러오는 중...</td></tr>
@@ -81,7 +81,7 @@
 
             <div class="detail-panel" id="detailPanel">
                 <div class="panel-header">
-                    <h3 id="detailPanelTitle"><i class="fas fa-info-circle"></i> 상세 정보</h3>
+                    <h3 id="detailPanelTitle">상세 정보</h3>
                      <button class="close-detail-btn" title="닫기">&times;</button>
                 </div>
                 <div class="panel-content" id="detailPanelContent">
@@ -93,36 +93,39 @@
 
     </div>
 
-    <div id="adminUploadModal" class="modal detail-panel-lookalike">
+    <div id="adminUploadModal" class="modal detail-panel-lookalike"> 
         <div class="panel-header">
-            <h3 id="modalUploadTitle"><i class="fas fa-cloud-upload-alt"></i> 상세 분석 파일 업로드</h3>
-            <button class="close-detail-btn" title="닫기" onclick="closeAdminModal()">&times;</button> </div>
-        <div class="panel-content">
-            <p><strong>대상:</strong> <span id="modalClientName"></span></p>
-            <input type="hidden" id="modalClientPhone">
-            <input type="hidden" id="modalClientRegion">
+        <h3 id="modalUploadTitle">상세 분석 파일 업로드</h3> <button class="close-detail-btn" title="닫기" onclick="closeAdminModal()">&times;</button>
+     </div>
+   <div class="panel-content">
+       <p><strong>대상:</strong> <span id="modalClientName"></span></p>
+       <input type="hidden" id="modalClientPhone">
+       <input type="hidden" id="modalClientRegion">
 
-            <label for="modalAudioFile"><i class="fas fa-volume-up"></i> 상담 녹음 파일 (Audio):</label>
-            <input type="file" id="modalAudioFile" accept="audio/*,.mp3,.wav,.m4a,.ogg" required>
+       <label for="modalAudioFile">상담 녹음 파일 (Audio):</label>
+       <input type="file" id="modalAudioFile" accept="audio/*,.mp3,.wav,.m4a,.ogg" required>
 
-            <label for="modalDocumentFile"><i class="fas fa-file-alt"></i> 참고 문서 (PDF, 이미지):</label>
-            <input type="file" id="modalDocumentFile" name="referenceFiles" multiple accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.gif,.webp,.ico">
+       <label for="modalPdfFile">참고 문서 (PDF):</label>
+       <input type="file" id="modalDocumentFile" name="referenceFiles" multiple accept=".jpg,.jpeg,.png,.bmp,.tiff,.PDF">
 
-            <label for="modalKeySelect"><i class="fas fa-key"></i> 주요 검토 사항:</label>
-            <select id="modalKeySelect" required>
-                <option value="" disabled selected>-- 키워드 선택 --</option>
-                <option value="고소장">고소장</option>
-                <option value="보충이유서">보충이유서</option>
-                <option value="검찰의견서">검찰의견서</option>
-            </select>
+       <label for="modalKeySelect">주요 검토 사항:</label>
+       <select id="modalKeySelect" required>
+           <option value="" disabled selected>-- 키워드 선택 --</option>
+           <option value="고소장">고소장</option>
+           <option value="보충이유서">보충이유서</option>
+           <option value="검찰의견서">검찰의견서</option>
+       </select>
 
-            <button id="confirmUploadBtn"><i class="fas fa-check"></i> 업로드 및 분석 시작</button>
-            <div id="adminUploadStatus"></div> </div>
-    </div>
+       <button id="confirmUploadBtn">업로드 및 분석 시작</button> <div id="adminUploadStatus"></div>
+   </div>
+</div>
 
 
     <div class="modal-backdrop" id="modalBackdrop"></div>
 
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 
 </body>
