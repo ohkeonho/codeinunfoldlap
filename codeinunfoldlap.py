@@ -723,6 +723,13 @@ def login_page():
     """고소장 관련 페이지를 보여주는 라우트 함수"""
     # 고소장 관련 데이터 처리 로직 추가 가능
     return render_template('login.html')
+    
+@app.route('/main')
+def login_page():
+    """고소장 관련 페이지를 보여주는 라우트 함수"""
+    # 고소장 관련 데이터 처리 로직 추가 가능
+    return render_template('index.html')
+
 
 @app.route('/admin')
 def admin_page():
