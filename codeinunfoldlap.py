@@ -1755,7 +1755,7 @@ def admin_upload_route_logic():
         # 프론트엔드에게 저장 성공 메시지 및 저장된 데이터의 storage_key를 반환합니다.
         # storage_key는 나중에 이 데이터를 조회할 때 사용됩니다.
         return jsonify({
-            'message': f'{key_topic} 처리 및 저장 완료 (대상 의뢰인: {client_email_target or "정보없음"})', # 메시지 수정
+            'message': f'{key_topic} 처리 및 저장 완료', # 메시지 수정
             'storage_key': storage_key, # 프론트엔드에서 이 키로 데이터를 조회하게 됩니다.
             'uploader_email': uploader_email, # 업로더 이메일 응답 포함 (정보용)
             'uploader_uid': uploader_uid # 업로더 UID 응답 포함 (정보용)
