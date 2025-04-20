@@ -5,6 +5,7 @@ let isFirebaseInitialized = false; // Firebase 초기화 상태
 let currentAdminToken = null;     // 관리자 페이지에서 사용할 토큰 저장용 (다른 페이지에서는 사용 안 함)
 let currentBackdrop = null;       // 모바일 백드롭 요소 (추가)
 
+
 // === 유틸리티 함수 ===
 function showLoading(indicatorElementId = 'loadingIndicator', message = '처리 중입니다...') {
     const indicator = document.getElementById(indicatorElementId);
@@ -121,7 +122,7 @@ function setupSidebarInteractions() {
         if (!adminContainer) console.warn("- Element with class '.admin-container' not found.");
     }
 }
-async function loadSummaries() {
+async function loadSummaries(user) {
     const memberListBody = document.getElementById('member-list-body');
     const itemTemplate = document.getElementById('member-row-template');
     const colspanValue = 6; // 이름, 지역, 번호, 상담일, 상태, 업로드버튼
@@ -138,7 +139,7 @@ async function loadSummaries() {
     try {
         const currentUser = firebase.auth().currentUser;
         if (!isFirebaseInitialized || !currentUser) { throw new Error("로그인 필요 또는 Firebase 미초기화"); }
-        idToken = await currentUser.getIdToken(true);
+        idToken = await user.getIdToken(true);
         currentAdminToken = idToken; // 토큰 저장 (상세보기용)
         console.log("[Admin] Admin ID Token acquired for list.");
     } catch (error) {
@@ -217,7 +218,12 @@ async function loadSummaries() {
                  // 업로드 버튼 리스너
                  adminUploadButton.addEventListener('click', (event) => {
                      event.stopPropagation();
-                     openAdminModal(tableRow.dataset.name, tableRow.dataset.phone, tableRow.dataset.region);
+                     openAdminModal(
+                        tableRow.dataset.name,
+                        tableRow.dataset.phone,
+                        tableRow.dataset.region,
+                        summaryInfo.user_email || '' 
+                        );
                  });
 
                  // 행 클릭 리스너 (상세보기)
@@ -267,7 +273,7 @@ async function loadSummaries() {
 } // --- End of loadSummaries ---
 
 // 관리자 업로드 모달 열기 (모달 dataset에 정보 저장)
-function openAdminModal(name, phone, region) {
+function openAdminModal(name, phone, region, email) {
      const modal = document.getElementById('adminUploadModal');
      const nameSpan = document.getElementById('modalClientName');
      const keySelect = document.getElementById('modalKeySelect');
@@ -285,12 +291,15 @@ function openAdminModal(name, phone, region) {
      modal.dataset.clientName = name || '';
      modal.dataset.clientPhone = phone || '';
      modal.dataset.clientRegion = region || '';
+     modal.dataset.clientEmail = email || '';
 
      // 표시 업데이트
      nameSpan.textContent = name || 'N/A';
-
+     nameSpan.textContent = `${name || 'N/A'}`;
      // 폼 리셋
-     keySelect.selectedIndex = 0; audioInput.value = null; docInput.value = null;
+     keySelect.selectedIndex = 0;
+    if (audioInput) audioInput.value = null;
+    if (docInput) docInput.value = null;
      statusDiv.textContent = ''; statusDiv.className = '';
      confirmBtn.disabled = false; confirmBtn.textContent = '업로드 및 분석 시작';
 
@@ -384,7 +393,7 @@ async function handleAdminUpload() {
          if (!result.ok) { throw new Error(result.data.error || `서버 오류: ${result.status}`); }
          adminUploadStatus.textContent = result.data.message || `업로드 성공!`;
          adminUploadStatus.className = 'status-success';
-         setTimeout(() => { loadSummaries(); closeAdminModal(); }, 1800);
+         setTimeout(() => { loadSummaries(firebase.auth().currentUser); closeAdminModal(); }, 1800);
      })
      .catch(error => {
           showError('adminUploadStatus', error.message);
@@ -519,7 +528,7 @@ if (typeof firebase !== 'undefined') {
         if (user) { // 로그인 상태
             if (memberListBody) { // 관리자 페이지
                 console.log("User logged in on Admin page. Calling loadSummaries().");
-                loadSummaries();
+                loadSummaries(user);
             } else { // 다른 페이지
                 console.log("User logged in, not on Admin page.");
             }

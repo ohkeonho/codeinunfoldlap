@@ -71,19 +71,20 @@ function initializeLoginForm() {
 
         // Firebase 이메일/비밀번호 로그인 시도
         auth.signInWithEmailAndPassword(email, password)
-            .then((userCredential) => {
-                // --- ▼▼▼ ID 토큰 방식: 로그인 성공 처리 (서버 호출 없음) ▼▼▼ ---
-                console.log(`app.js: Firebase 로그인 성공 (${userCredential.user.email}).`);
-                messageDiv.textContent = '로그인 성공! 메인 페이지로 이동합니다...';
-                messageDiv.style.color = 'green';
+        .then((userCredential) => {
+            // --- ▼▼▼ ID 토큰 방식: 로그인 성공 처리 (서버 호출 없음) ▼▼▼ ---
+            console.log(`app.js: Firebase 로그인 성공 (${userCredential.user.email}).`);
+            messageDiv.textContent = '로그인 성공! 메인 페이지로 이동합니다...';
+            messageDiv.style.color = 'green';
 
-                // ID 토큰 방식에서는 서버와 즉시 통신할 필요 없음.
-                // 실제 API 요청 시점에 ID 토큰을 가져와서 사용함.
+            // ID 토큰 방식에서는 서버와 즉시 통신할 필요 없음.
+            // 실제 API 요청 시점에 ID 토큰을 가져와서 사용함.
 
-                // 로그인 성공 후 메인 페이지로 이동 (예: 0.5초 후)
-                setTimeout(() => {
-                     window.location.href = '/main'; // 메인 페이지 경로
-                }, 500);
+            // 로그인 성공 후 메인 페이지로 이동 (예: 0.5초 후)
+            setTimeout(() => {
+                window.location.href = `/main`; // 수정됨
+            }, 500);
+                
                 // --- ▲▲▲ ID 토큰 방식: 로그인 성공 처리 ▲▲▲ ---
             })
             .catch((error) => {
