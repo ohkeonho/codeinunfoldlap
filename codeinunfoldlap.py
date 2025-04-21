@@ -40,7 +40,7 @@ except ImportError:
 try:
     # pypdf 는 PyPDF2의 개선된 최신 버전입니다. 가능하면 pypdf를 사용하세요.
     # 설치: pip install pypdf
-    from pypdf import PdfReader
+    from PyPDF2 import PdfReader
     # 만약 구 버전 PyPDF2를 꼭 사용해야 한다면 아래 주석 해제하고 위 라인 주석 처리
     # 설치: pip install pypdf2
     # from PyPDF2 import PdfReader
