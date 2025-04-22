@@ -221,6 +221,7 @@ def summarize_with_context(transcribed_text, all_document_text_parts, key_topic,
     if(key_topic == "고소장"):
         prompt = f"""
         넌 대한민국 최고의 변호사야 지금부터 '{key_topic}' 초안을 작성해줘야돼 이전 상담 내용정리하고 법률분석 한거랑 이번 상담 녹취록 그리고 PDF 내용을 기반으로 작성해.
+        결과에 마크다운 문법(##, **)은 사용하지 마세요.
         {all_document_text_parts}{previous_summary_text}{transcribed_text}
         """
     elif(key_topic == "보충이유서"):
@@ -278,7 +279,9 @@ def summarize_with_context(transcribed_text, all_document_text_parts, key_topic,
 
         # --- Return based on extraction ---
         if summary_text:
+            summary_text= summary_text.replace('##', '').replace('**', '').replace('*','')
             return summary_text # <<< SUCCESSFUL RETURN
+        
         else:
             print(f"⚠️ Gemini 내용 없음 또는 텍스트 추출 불가. 응답 객체: {response}")
             return "Gemini 분석 생성 중 응답 처리 오류 발생 (내용 없음 또는 추출 불가)." # <<< RETURN on extraction failure
@@ -334,6 +337,7 @@ def summarize_text_with_gemini(text_to_summarize):
                      summary_text = candidate.content.parts[0].text
 
         if summary_text:
+            summary_text= summary_text.replace('##', '').replace('**', '').replace('*','')
             return summary_text
         else:
             # 응답은 받았으나 텍스트 추출 실패 시
@@ -1815,7 +1819,8 @@ def admin_upload_route_logic():
             except OSError as e_rem: print(f"🚨 (finally) 오디오 임시 파일 삭제 실패: {e_rem}")
         for doc_path in temp_doc_paths:
             if doc_path and os.path.exists(doc_path):
-                try: os.remove(doc_path); print(f"🧹 (finally) 문서 임시 파일 삭제: {doc_path}")
+                try:print(f"🧹 (finally) 문서 임시 파일 삭제: {doc_path}")
+                
                 except OSError as e_rem: print(f"🚨 (finally) 문서 임시 파일 삭제 실패: {e_rem}")
         print(f"--- '/admin/upload' 요청 처리 완료 ---") # 처리 완료 로그 추가
 
