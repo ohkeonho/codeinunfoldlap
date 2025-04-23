@@ -13,13 +13,14 @@
             <i class="fas fa-bars"></i>
         </button>
         <aside class="sidebar">
+            
             <nav>
                 <ul>
                     <li><a href="{{ url_for('admin_page') }}" ><i class="fas fa-users"></i> <span class="sidebar-text">의뢰인</span></a></li>
                     <li><a href="{{ url_for('plaint_page') }}"><i class="fas fa-file-alt"></i> <span class="sidebar-text">고소장</span></a></li>
-                    <li><a href="{{ url_for('supplementary_page') }}" ><i class="fas fa-file-medical-alt"></i> <span class="sidebar-text">보충이유서</span></a></li>
-                    <li><a href="{{ url_for('prosecutor_page') }}"class="active"><i class="fas fa-gavel"></i> <span class="sidebar-text">검찰의견서</span></a></li>
-                    <li><a href="{{ url_for('agreements_page') }}" ><i class="fa-sharp fa-regular fa-file"></i> <span class="sidebar-text">합의서</span></a></li>
+                    <li><a href="{{ url_for('supplementary_page') }}"><i class="fas fa-file-medical-alt"></i> <span class="sidebar-text">보충이유서</span></a></li>
+                    <li><a href="{{ url_for('prosecutor_page') }}" ><i class="fas fa-gavel"></i> <span class="sidebar-text">검찰의견서</span></a></li>
+                    <li><a href="{{ url_for('agreements_page') }}" class="active"><i class="fa-sharp fa-regular fa-file"></i> <span class="sidebar-text">합의서</span></a></li>
                     <li><a href="{{ url_for('main_page') }}"><i class="fas fa-microphone-alt"></i> <span class="sidebar-text">음성처리 페이지</span></a></li>
                 </ul>
                 <div class="sidebar-bottom-toggle">
@@ -31,7 +32,7 @@
 
         <main class="content">
             <header>
-                <h2 id="mainHeaderTitle"><i class="fas fa-list-alt"></i> 전체 검찰의견서 목록</h2>
+                <h2 id="mainHeaderTitle"><i class="fas fa-list-alt"></i> 전체 합의서 목록</h2>
             </header>
 
             <section id="clientListView">
@@ -79,6 +80,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/prosecutor.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/agreement.js') }}"></script>
 </body>
 </html>

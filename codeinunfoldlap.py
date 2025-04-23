@@ -218,25 +218,10 @@ def summarize_with_context(transcribed_text, all_document_text_parts, key_topic,
     if not gemini_model: return "Gemini API 미설정"
     if not hasattr(gemini_model, 'generate_content'): return "Gemini 모델 초기화 오류"
     if not transcribed_text and not all_document_text_parts and not previous_summary_text: return "분석할 내용(녹취록, PDF, 이전 요약)이 전혀 없습니다."
-    if(key_topic == "고소장"):
-        prompt = f"""
-        넌 대한민국 최고의 변호사야 지금부터 '{key_topic}' 초안을 작성해줘야돼 이전 상담 내용정리하고 법률분석 한거랑 이번 상담 녹취록 그리고 PDF 내용을 기반으로 작성해.
-        결과에 마크다운 문법(##, **)은 사용하지 마세요.
-        {all_document_text_parts}{previous_summary_text}{transcribed_text}
-        """
-    elif(key_topic == "보충이유서"):
-        prompt = f"""
-        넌 대한민국 최고의 변호사야 지금부터 '{key_topic}' 초안을 작성해줘야돼 이전 상담 내용정리하고 법률분석 한거랑 이번 상담 녹취록 그리고 PDF 내용을 기반으로 작성해.
-        {all_document_text_parts}{previous_summary_text}{transcribed_text}
-        """
-        # 
-    elif(key_topic == "검찰의견서"):
-        prompt = f"""
-        넌 대한민국 최고의 변호사야 지금부터 '{key_topic}' 초안을 작성해줘야돼 이전 상담 내용정리하고 법률분석 한거랑 이번 상담 녹취록 그리고 PDF 내용을 기반으로 작성해.
-        {all_document_text_parts}{previous_summary_text}{transcribed_text}
-       
-
-        """
+    prompt = f"""
+    넌 대한민국 최고의 변호사야 지금부터 '{key_topic}' 초안을 작성해줘야돼 이전 상담 내용정리하고 법률분석 한거랑 이번 상담 녹취록 그리고 PDF 내용을 기반으로 작성해.
+    {all_document_text_parts}{previous_summary_text}{transcribed_text}
+    """
     # --- End of Prompt ---
 
     # --- Outer Try-Except block for API call ---
@@ -912,6 +897,13 @@ def prosecutor_page():
     # admin.html 안에는 {{ url_for('index') }} 와 {{ url_for('plaint_page') }} 링크가 포함됨
     return render_template('prosecutor.html')
 
+@app.route('/agreements')
+def agreements_page():
+    """합의서 페이지(사이드바 포함된 페이지)를 보여주는 라우트 함수"""
+    # 관리자 인증 로직 등 추가 가능
+    # admin.html 안에는 {{ url_for('index') }} 와 {{ url_for('plaint_page') }} 링크가 포함됨
+    return render_template('agreement.html')
+
 
 # app.py 또는 server.py 파일 내용 중
 
@@ -1083,6 +1075,65 @@ def list_prosecutor_opinions():
         print(f"🚨 검찰의견서 목록 생성 오류 (요청자: {requester_email}): {e}")
         traceback.print_exc()
         return jsonify({"error":"검찰의견서 목록 생성 실패", "detail": str(e)}), 500
+
+@app.route("/api/agreements", methods=['GET']) # 라우트 경로를 /api/agreements 로 변경하고 GET 메서드 명시
+def list_agreements(): # 함수 이름을 list_agreements 로 변경
+    """합의서 목록 반환 (인증 및 소유권/관리자/토픽 필터링)""" # 설명 수정
+    id_token = None
+    uploader_uid = None # 요청자 UID (로깅용)
+    requester_email = '이메일 정보 없음' # 요청자 이메일
+
+    # user_memory_storage 전역 변수 사용 명시 ▼▼▼
+    global user_memory_storage
+
+    # auth 객체가 초기화되어 있는지 확인합니다. (실제 auth 또는 Mock)
+    if not auth:
+        print("🚨 /api/agreements: Firebase Auth object not available.") # 로그 메시지 수정
+        return jsonify({"error": "Server authentication system error"}), 500
+
+    try:
+        # --- ▼▼▼ ID 토큰 확인 및 요청자 UID, 이메일 얻기 (필수!) ▼▼▼ ---
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            print("🚨 /api/agreements: 인증 토큰 없음.") # 로그 메시지 수정
+            # 목록 조회를 위해 인증 필수
+            return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+
+        id_token = auth_header.split('Bearer ')[1]
+        try:
+            decoded_token = auth.verify_id_token(id_token) # 토큰 검증
+            uploader_uid = decoded_token.get('uid') # 요청자 UID (get 사용)
+            requester_email = decoded_token.get('email', '이메일 정보 없음') # 요청자 이메일 추출
+
+            if requester_email == '이메일 정보 없음':
+                print("🚨 /api/agreements: 유효 토큰이나 이메일 정보 없음. 목록 필터링 불가.") # 로그 메시지 수정
+                # 필터링을 위해 이메일 필수
+                return jsonify({"error": "인증 토큰에 이메일 정보가 없습니다. 목록 필터링 불가."}), 401 # 또는 403
+
+            print(f"ℹ️ /api/agreements 요청 사용자 UID: {uploader_uid}, Email: {requester_email}") # 로그 메시지 수정
+            # 관리자 체크는 _create_summary_list 내부에서 이메일로 수행됩니다.
+
+        except Exception as auth_err: # 토큰 검증/정보 추출 오류
+            print(f"🚨 /api/agreements: 토큰 검증 오류: {auth_err}") # 로그 메시지 수정
+            traceback.print_exc()
+            is_invalid_token_error = isinstance(auth_err, auth.InvalidIdTokenError) if hasattr(auth, 'InvalidIdTokenError') else ("Invalid Token" in str(auth_err))
+            error_status_code = 401 if is_invalid_token_error else 500
+            return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 500
+        # --- ▲▲▲ ID 토큰 확인 및 요청자 UID, 이메일 얻기 ▲▲▲ ---
+
+        # --- 인증 통과 후 로직 수행 (데이터 필터링) ---
+        print(f"--- '/api/agreements' 데이터 조회 시작 (요청자: {requester_email}) ---") # 로그 메시지 수정
+        # user_memory_storage 전체에서 합의서 목록을 가져오되, 요청자의 이메일과 토픽("합의서")으로 필터링 ▼▼▼
+        # _create_summary_list 함수는 다른 곳에 정의되어 있으며, user_memory_storage 구조를 탐색하고 필터링합니다.
+        data = _create_summary_list(user_memory_storage, requester_email, required_topic="합의서") # <--- 조회 대상을 user_memory_storage로 변경하고 토픽을 "합의서"로 변경
+
+        print(f"--- '/api/agreements' 처리 완료, {len(data)}개 항목 반환 ---") # 로그 메시지 수정
+        return jsonify(data)
+
+    except Exception as e:
+        print(f"🚨 합의서 목록 생성 오류 (요청자: {requester_email}): {e}") # 로그 메시지 및 에러 메시지 수정
+        traceback.print_exc()
+        return jsonify({"error":"합의서 목록 생성 실패", "detail": str(e)}), 500 # 에러 메시지 수정
 
 
 user_memory_storage = {}  # /upload, /record 결과 저장용
