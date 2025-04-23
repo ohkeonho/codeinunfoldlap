@@ -246,6 +246,176 @@ a:hover { text-decoration: underline; }
 {
     margin-left: var(--sidebar-width-expanded); /* 펼친 너비만큼 마진 */
 }
+
+
+.user-profile-card .profile-header {
+    display: flex; /* 자식 요소를 가로로 배치 */
+    align-items: center; /* 세로 중앙 정렬 */
+    justify-content: space-between; /* 항목 사이에 공간 배분 */
+    margin-bottom: 20px; /* 아래쪽 여백 추가 */
+    /* 필요에 따라 패딩 등을 조정 */
+    width: 100%; /* 부모 너비 전체 사용 */
+    box-sizing: border-box; /* 패딩/보더 포함 너비 계산 */
+}
+
+.user-profile-card .profile-header .profile-info {
+    /* 프로필 정보 영역이 필요한 공간만 차지하고 미니 캘린더가 오른쪽으로 가도록 */
+    /* flex-shrink: 0; */ /* 필요하다면 추가 */
+     margin-right: 20px; /* 프로필 정보와 캘린더 사이에 여백 */
+}
+
+/* 미니 캘린더 스타일 */
+#mini-calendar {
+    width: 200px; /* 원하는 작은 크기로 조절 */
+    /* height: 180px; */ /* 높이를 고정하거나 auto로 설정 */
+    font-size: 0.8em; /* 글자 크기 작게 */
+    border: 1px solid #ccc; /* 테두리 추가 */
+    border-radius: 5px;
+    padding: 5px; /* 내부 여백 */
+    cursor: pointer; /* 클릭 가능한 표시 */
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.1); /* 그림자 효과 */
+    background-color: #fff; /* 배경색 */
+    /* FullCalendar 자체 클래스를 이용하여 세부 스타일 조정 */
+}
+
+/* 미니 캘린더 툴바 숨기기 및 간소화 (선택 사항) */
+#mini-calendar .fc-header-toolbar {
+    margin-bottom: 0; /* 툴바 아래 여백 제거 */
+    padding: 0 5px; /* 툴바 좌우 패딩 */
+    min-height: auto; /* 높이 최소값 제거 */
+}
+
+#mini-calendar .fc-header-toolbar h2 { /* 툴바 제목 스타일 */
+    font-size: 1em;
+    margin: 0;
+}
+
+#mini-calendar .fc-button-group { /* 툴바 버튼 그룹 */
+     margin: 0;
+}
+#mini-calendar .fc-button { /* 툴바 버튼 */
+    padding: 2px 5px;
+    font-size: 0.8em;
+}
+
+
+#mini-calendar .fc-view-harness {
+    /* 미니 달력 뷰의 최소 높이 등을 조절 */
+    min-height: auto !important; /* 중요! FullCalendar 기본값 무시 */
+    height: 100% !important; /* 중요! 컨테이너에 맞게 높이 설정 */
+}
+
+#mini-calendar .fc-scrollgrid-sync-table {
+    width: 100% !important; /* 테이블 너비 조정 */
+}
+
+#mini-calendar .fc-daygrid-day-number { /* 날짜 숫자 스타일 */
+    font-size: 0.9em;
+    padding: 2px;
+}
+#mini-calendar .fc-day-other .fc-daygrid-day-number {
+    opacity: 0.5; /* 이전/다음 달 날짜 흐리게 */
+}
+/* 이벤트 점 등 미니 캘린더에서 불필요한 요소 숨기기 (선택 사항) */
+#mini-calendar .fc-daygrid-event-dot {
+    display: none;
+}
+
+
+/* 모달 기본 스타일 */
+.modal {
+    display: none; /* 기본적으로 숨김 */
+    position: fixed; /* 고정 위치 */
+    z-index: 1050; /* 다른 요소들 위에 표시 (백드롭보다 높게) */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto; /* 내용이 넘칠 경우 스크롤 */
+    /* background-color: rgba(0,0,0,0.4); */ /* 백드롭은 별도 요소 사용 */
+    padding-top: 20px; /* 모달 내용 상단 여백 (가운데 정렬 시 필요 없을 수도) */
+    animation: fadeInModal 0.3s ease-out; /* 나타날 때 페이드인 애니메이션 */
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto; /* 상단 여백 및 좌우 중앙 정렬 */
+    padding: 20px;
+    border: 1px solid #888;
+    width: 90%; /* 모달 너비 */
+    max-width: 900px; /* 최대 너비 설정 (큰 캘린더 크기에 맞게) */
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    position: relative; /* 닫기 버튼 배치를 위해 */
+    border-radius: 8px;
+    animation: slideInModal 0.3s ease-out; /* 나타날 때 슬라이드인 애니메이션 */
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.5em; /* 모달 제목 크기 */
+}
+
+.modal-body {
+    /* 모달 내 캘린더 영역 스타일 */
+    /* 필요에 따라 높이 등을 지정할 수 있습니다. */
+}
+
+.close-button {
+    color: #aaa;
+    font-size: 30px; /* 닫기 버튼 크기 */
+    font-weight: bold;
+    position: absolute; /* 모달 콘텐츠 우측 상단에 위치 */
+    top: 10px;
+    right: 15px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    transition: color 0.3s ease; /* 호버 시 색상 변경 애니메이션 */
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: #000;
+    text-decoration: none;
+    outline: none; /* 포커스 시 외곽선 제거 */
+}
+
+/* 모달 백드롭 스타일 */
+.modal-backdrop {
+     display: none; /* 기본 숨김 */
+     position: fixed;
+     top: 0;
+     left: 0;
+     width: 100%;
+     height: 100%;
+     background: rgba(0, 0, 0, 0.5); /* 반투명 검은색 */
+     z-index: 1040; /* 모달보다는 아래, 다른 콘텐츠보다는 위 */
+     animation: fadeInBackdrop 0.3s ease-out; /* 나타날 때 페이드인 애니메이션 */
+}
+
+/* 모달 나타날 때 애니메이션 키프레임 */
+@keyframes fadeInModal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes slideInModal {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+@keyframes fadeInBackdrop {
+    from { opacity: 0; }
+    to { opacity: 0.5; } /* 백드롭 투명도 */
+}
+
 /* ▲▲▲ --------------------------------------------- ▲▲▲ */
 
 /* --- Sidebar Toggle Button (상단 햄버거 - 모바일용) --- */
@@ -317,6 +487,8 @@ button.secondary:hover, #stopRecording:hover { background-color: #f8fafd; border
     background-color: #f8d7da;
     border: 1px solid #f5c6cb;
 }
+
+
 
 #adminUploadStatus.status-success { color: #1e8e3e; background-color: #e6f4ea; border-color: #ceead6; display: block; }
 .modal-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(95,99,104,.8); z-index: 1040; opacity: 0; transition: opacity 0.15s linear; }

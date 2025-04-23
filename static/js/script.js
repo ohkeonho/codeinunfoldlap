@@ -576,7 +576,206 @@ document.addEventListener('DOMContentLoaded', () => {
 
 }); // === End DOMContentLoaded ===
 
+document.addEventListener('DOMContentLoaded', function() {
+    const miniCalendarEl = document.getElementById('mini-calendar');
+    const modalCalendarEl = document.getElementById('fullcalendar-modal');
+    const calendarModal = document.getElementById('calendarModal');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const closeCalendarModalBtn = document.getElementById('closeCalendarModal');
 
+    // --- 미니 캘린더 초기화 ---
+    if (miniCalendarEl) {
+        miniCalendar = new FullCalendar.Calendar(miniCalendarEl, {
+            initialView: 'dayGridMonth', // 월간 뷰
+            locale: 'ko', // 한국어
+            headerToolbar: { // 툴바 설정 (간소화)
+                left: 'prev,next',
+                center: 'title',
+                right: '' // 버튼 숨김
+            },
+            events: '/api/events', // 이벤트 소스 (Flask 백엔드에서 제공해야 함)
+            height: 'auto', // 높이 자동 조절 (작은 크기에 맞게)
+            contentHeight: 'auto', // 콘텐츠 높이 자동 조절
+            aspectRatio: 1.2, // 너비/높이 비율 조정 (작은 캘린더에 적합)
+            eventDisplay: 'none', // 미니 캘린더에서는 이벤트 표시 안 함 (선택 사항)
+                                 // 'list-item' 등으로 설정하여 간단히 표시 가능
+
+            // 미니 캘린더 날짜 또는 배경 클릭 시 모달 열기
+            dateClick: function(info) {
+                 // 클릭한 날짜 정보를 가지고 모달 열기
+                 openCalendarModal(info.date);
+            },
+             // 툴바 포함 미니 캘린더 영역 전체 클릭 시 모달 열기 (dateClick과 함께 사용 시 클릭 범위가 넓어짐)
+            /*
+             DidMount: function(info) {
+                 info.el.addEventListener('click', function(event) {
+                     // 이벤트 버블링 방지 (필요시)
+                     // event.stopPropagation();
+                     // dateClick 이벤트와 중복될 수 있으니 주의하여 사용
+                     if (!event.target.closest('.fc-daygrid-day-number') && !event.target.closest('.fc-button')) {
+                          // 날짜 숫자나 버튼 클릭이 아닌 경우에만 모달 열기
+                           openCalendarModal(miniCalendar.getDate()); // 현재 미니 달력의 날짜로 열기
+                     }
+                 });
+            }
+            */
+        });
+        miniCalendar.render(); // 미니 캘린더 바로 렌더링
+    } else {
+        console.error("Mini calendar container element not found!");
+    }
+
+    // --- 큰 캘린더 (모달용) 초기화 ---
+    if (modalCalendarEl) {
+         modalCalendar = new FullCalendar.Calendar(modalCalendarEl, {
+            initialView: 'dayGridMonth', // 기본 뷰
+            locale: 'ko', // 한국어
+             headerToolbar: { // 큰 달력에는 전체 툴바 표시
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay' // 뷰 전환 버튼
+            },
+            events: '/api/events', // 동일한 이벤트 소스 사용
+            editable: true, // 이벤트 드래그, 리사이즈 등 편집 가능 여부 (필요 시)
+            selectable: true, // 날짜/시간 범위 선택 가능 여부 (필요 시)
+            height: 'auto', // 모달 높이에 맞게 자동 조절
+            // aspectratio: 1.8, // 너비/높이 비율 조절
+
+            // 이벤트 클릭 시 상세 정보 표시 (이전 예시 참고)
+             eventClick: function(info) {
+                 console.log('Event clicked:', info.event);
+                 // alert('Event: ' + info.event.title + '\nStarts: ' + info.event.start.toLocaleString());
+                 // 여기에 이벤트 상세 정보를 보여주는 모달이나 패널을 띄우는 로직 구현
+             },
+              // 날짜 선택 시 이벤트 추가 등 (필요 시)
+            select: function(info) {
+                console.log('Date range selected:', info.startStr, info.endStr, info.allDay);
+                // const eventTitle = prompt('새 이벤트 제목:');
+                // if (eventTitle) {
+                //     // FullCalendar에 이벤트 임시 추가
+                //     modalCalendar.addEvent({
+                //         title: eventTitle,
+                //         start: info.startStr,
+                //         end: info.endStr, // FullCalendar는 끝 날짜/시간 포함
+                //         allDay: info.allDay
+                //     });
+                //     // TODO: 이벤트를 백엔드에 저장하는 API 호출 필요
+                // }
+            },
+            // 이벤트 드래그/리사이즈 후 업데이트 (editable: true 시)
+             eventDrop: function(info) {
+                 console.log('Event dropped:', info.event);
+                 // TODO: 백엔드에 이벤트 시간/날짜 변경 API 호출 필요
+             },
+             eventResize: function(info) {
+                 console.log('Event resized:', info.event);
+                 // TODO: 백엔드에 이벤트 시간/날짜 변경 API 호출 필요
+             },
+
+             // 캘린더 뷰 변경 시 (예: 월 -> 주로 이동)
+             viewDidMount: function(info) {
+                 console.log('View changed to:', info.view.type);
+                 // 필요하다면 뷰 변경 시 추가 로직 수행
+             }
+        });
+        // modalCalendar.render(); // !! 모달이 열릴 때 렌더링하므로 여기서 바로 호출하지 않음
+    } else {
+         console.error("Modal calendar container element not found!");
+    }
+
+    // --- 모달 열기/닫기 함수 및 이벤트 핸들러 ---
+
+    // 모달 열기 함수
+    function openCalendarModal(initialDate = null) {
+        // 모달과 백드롭 표시
+        calendarModal.style.display = 'block';
+        modalBackdrop.style.display = 'block';
+        // 필요시 애니메이션 클래스 추가
+        // calendarModal.classList.add('is-visible');
+        // modalBackdrop.classList.add('is-visible');
+
+
+        // 모달이 열릴 때 큰 달력 렌더링 또는 크기 업데이트
+        if (modalCalendar) {
+             // 중요: 모달이 보이게 된 후에 렌더링 또는 updateSize 호출
+             if (!modalCalendar.el.hasChildNodes() || modalCalendar.getEvents().length === 0) {
+                 // 처음 렌더링되거나 이벤트가 없는 경우 render() (필요시)
+                 // 보통은 updateSize() 만으로 충분
+                 // modalCalendar.render(); // 일반적으로 필요 없음
+                  modalCalendar.updateSize(); // 필수: 모달 크기에 맞춰 캘린더 크기 조정
+             } else {
+                 // 이미 렌더링되었다면 크기만 업데이트
+                 modalCalendar.updateSize(); // 필수
+             }
+
+            // 초기 날짜가 지정되었다면 해당 날짜로 이동
+            if (initialDate) {
+                modalCalendar.gotoDate(initialDate);
+            } else if (miniCalendar) {
+                // 초기 날짜가 없으면 미니 캘린더의 현재 뷰 날짜로 이동
+                 modalCalendar.gotoDate(miniCalendar.getDate());
+            }
+
+            // 이벤트 데이터 새로고침 (필요시)
+            // modalCalendar.refetchEvents();
+        }
+    }
+
+    // 모달 닫기 함수
+    function closeCalendarModal() {
+        // 모달과 백드롭 숨김
+        calendarModal.style.display = 'none';
+        modalBackdrop.style.display = 'none';
+         // 필요시 애니메이션 클래스 제거 또는 hidden 클래스 추가
+        // calendarModal.classList.remove('is-visible');
+        // modalBackdrop.classList.remove('is-visible');
+        // calendarModal.classList.add('is-hidden'); // 애니메이션용
+        // modalBackdrop.classList.add('is-hidden'); // 애니메이션용
+
+        // FullCalendar 인스턴스는 메모리에 유지
+        // 모달 닫을 때마다 완전히 파괴하고 싶다면 modalCalendar.destroy(); 호출 후
+        // 열 때 새로 new FullCalendar.Calendar(...) 해야 함. 일반적으로 유지하는 것이 효율적.
+    }
+
+    // 닫기 버튼 클릭 이벤트
+    if (closeCalendarModalBtn) {
+        closeCalendarModalBtn.addEventListener('click', closeCalendarModal);
+    }
+
+    // 모달 백드롭 클릭 시 닫기
+    if (modalBackdrop) {
+        modalBackdrop.addEventListener('click', function(event) {
+            // 백드롭 자체가 클릭되었는지 확인 (모달 콘텐츠 내부 클릭 무시)
+             // calendarModal이 현재 표시되어 있는지 확인
+            if (event.target === modalBackdrop && calendarModal.style.display === 'block') {
+                 // 상세 업로드 모달 등 다른 모달과 백드롭을 공유하는 경우
+                 // 어떤 모달이 열려있는지 확인하는 로직 추가 필요
+                 // 예: if (calendarModal.style.display === 'block') closeCalendarModal();
+                 // else if (adminUploadModal.style.display === 'block') closeAdminModal();
+                 closeCalendarModal(); // 현재는 캘린더 모달만 닫도록 처리
+            }
+        });
+    }
+
+    // 미니 캘린더 컨테이너 자체 클릭 시 모달 열기
+    // dateClick 이벤트와 함께 사용하면 클릭 범위가 넓어집니다.
+    // 특정 영역(예: 제목) 클릭 시만 열고 싶다면 해당 요소에 이벤트 리스너 추가
+    if (miniCalendarEl) {
+         miniCalendarEl.addEventListener('click', function(event) {
+             // FullCalendar의 내부 클릭 이벤트(dateClick, button click 등)와의 충돌 방지
+             // 이벤트가 이미 FullCalendar 내부에서 처리되었으면 모달 열지 않음
+             // (예: 날짜 셀 클릭이나 버튼 클릭 시 dateClick 이벤트가 먼저 발생)
+             // 만약 dateClick 이벤트에서 모달을 열고 있다면 이 부분은 제거하거나 조건을 더 구체적으로 작성
+             // 여기서는 dateClick에서 모달을 열도록 하므로, 이 리스너는 제거하거나 주석 처리하는 것이 좋습니다.
+             // openCalendarModal(miniCalendar.getDate());
+              // console.log("Mini calendar element clicked, opening modal");
+         });
+    }
+
+    // --- 기타 페이지 초기화 로직 ---
+    // 예: 테이블 데이터 로드 함수 호출
+    // fetchMembers();
+});
 // === Firebase Auth 상태 변경 리스너 ===
 if (typeof firebase !== 'undefined') {
     firebase.auth().onAuthStateChanged(user => {
