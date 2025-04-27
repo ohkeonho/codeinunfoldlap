@@ -443,7 +443,7 @@ async function handleAdminUpload() {
      formData.append('region', region); // dataset에서 읽은 값
 
      // Fetch 요청 (백엔드 /admin/upload 경로 사용)
-     fetch('/admin/upload', {
+     fetch('/api/admin/upload', {
          method: 'POST',
          headers: { 'Authorization': `Bearer ${uploaderToken}` },
          body: formData
@@ -538,7 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const formData = new FormData(); formData.append('file', audioFile); formData.append('name', name); formData.append('phone', phone); formData.append('region', region);
                 showLoading('loadingIndicator','업로드 및 처리중...');
                 try {
-                    const response = await fetch('/upload', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` }, body: formData });
+                    const response = await fetch('/api/upload', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` }, body: formData });
                      if (!response.ok) { const errText = await response.text(); let errJson={}; try {errJson=JSON.parse(errText);}catch(e){} throw new Error(errJson.error||`서버 오류(${response.status})`); }
                      const data = await response.json();
                      if (data.error) { showError('errorIndicator', data.error+(data.detail?` (${data.detail})`:'')); } else { showResults('originalText','geminiSummary', data.original_text, data.summary); if(uploadForm) uploadForm.reset(); }
@@ -563,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
                           let idToken; try{showLoading('loadingIndicator','인증 확인중...'); idToken = await user.getIdToken(true);}catch(e){showError('errorIndicator','토큰 오류');startRecordingBtn.disabled=false; stopRecordingBtn.disabled=true; hideLoading('loadingIndicator'); return;}
                           const formData = new FormData(); formData.append('file', file); formData.append('name', name); formData.append('phone', phone); formData.append('region', region);
                           showLoading('loadingIndicator','녹음 처리중...');
-                          try { const resp = await fetch('/record', {method:'POST',headers:{'Authorization':`Bearer ${idToken}`},body:formData}); if(!resp.ok){const errD=await resp.json().catch(()=>({error:`HTTP ${resp.status}`}));throw new Error(errD.error||`서버 오류(${resp.status})`);} const data=await resp.json(); if(data.error){showError('errorIndicator',data.error+(data.detail?` (${data.detail})`:''));}else{showResults('originalText','geminiSummary',data.original_text, data.summary);} }
+                          try { const resp = await fetch('/api/record', {method:'POST',headers:{'Authorization':`Bearer ${idToken}`},body:formData}); if(!resp.ok){const errD=await resp.json().catch(()=>({error:`HTTP ${resp.status}`}));throw new Error(errD.error||`서버 오류(${resp.status})`);} const data=await resp.json(); if(data.error){showError('errorIndicator',data.error+(data.detail?` (${data.detail})`:''));}else{showResults('originalText','geminiSummary',data.original_text, data.summary);} }
                           catch(error){showError('errorIndicator', error.message);} finally {startRecordingBtn.disabled=false; stopRecordingBtn.disabled=true; hideLoading('loadingIndicator');}
                       }; mediaRecorder.start(); startRecordingBtn.disabled = true; stopRecordingBtn.disabled = false;
                      const rA=document.getElementById('resultsArea'); if(rA)rA.style.display='none'; const eI=document.getElementById('errorIndicator'); if(eI)eI.style.display='none'; showLoading('loadingIndicator',"녹음 중...");
