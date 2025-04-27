@@ -84,7 +84,7 @@ except Exception as e:
 # 예: GOOGLE_API_KEY_PATH = "/home/youruser/keys/notional-buffer-445706-e0-b736090bdc8a.json"
 app = Flask(__name__)
 CORS(app)
-
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 # --- 설정 (Clova, Gemini) ---
 invoke_url = 'https://clovaspeech-gw.ncloud.com/external/v1/10943/01c19849854a8e51219a3e63a98d4a4565d71c73ee7566fdf84957a80c1897be'
 secret = '63d30b73e68b4defa3dc1815153985ba'
