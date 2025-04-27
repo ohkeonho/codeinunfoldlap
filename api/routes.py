@@ -1203,7 +1203,7 @@ def debug_memory_contents():
         return jsonify({"error": "Failed to serialize memory content", "detail": str(e)}), 500
 
 
-@api_bp.route("/api/events", methods=['GET'])
+@api_bp.route("/events", methods=['GET'])
 def get_calendar_events():
     """
     인증된 사용자의 user_memory_storage 데이터 항목들을 FullCalendar 이벤트 형식으로 반환합니다.
