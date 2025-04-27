@@ -218,10 +218,26 @@ def summarize_with_context(transcribed_text, all_document_text_parts, key_topic,
     if not gemini_model: return "Gemini API 미설정"
     if not hasattr(gemini_model, 'generate_content'): return "Gemini 모델 초기화 오류"
     if not transcribed_text and not all_document_text_parts and not previous_summary_text: return "분석할 내용(녹취록, PDF, 이전 요약)이 전혀 없습니다."
-    prompt = f"""
-    넌 대한민국 최고의 변호사야 지금부터 '{key_topic}' 초안을 작성해줘야돼 이전 상담 내용정리하고 법률분석 한거랑 이번 상담 녹취록 그리고 PDF 내용을 기반으로 작성해.
-    {all_document_text_parts}{previous_summary_text}{transcribed_text}
-    """
+    if(key_topic=='고소장'):
+        prompt = f"""
+        넌 대한민국 최고의 변호사야 지금부터 '{key_topic}' 초안을 작성해줘야돼 이전 상담 내용정리하고 법률분석 한거랑 이번 상담 녹취록 그리고 PDF 내용을 기반으로 작성해.
+        {all_document_text_parts}{previous_summary_text}{transcribed_text}
+        """
+    elif(key_topic=='보충이유서'):
+        prompt = f"""
+        넌 대한민국 최고의 변호사야 지금부터 '{key_topic}' 초안을 작성해줘야돼 이전 상담 내용정리하고 법률분석 한거랑 이번 상담 녹취록 그리고 PDF 내용을 기반으로 작성해.
+        {all_document_text_parts}{previous_summary_text}{transcribed_text}
+        """
+    elif(key_topic=='검찰의견서'):
+        prompt = f"""
+        넌 대한민국 최고의 변호사야 지금부터 '{key_topic}' 초안을 작성해줘야돼 이전 상담 내용정리하고 법률분석 한거랑 이번 상담 녹취록 그리고 PDF 내용을 기반으로 작성해.
+        {all_document_text_parts}{previous_summary_text}{transcribed_text}
+        """
+    elif(key_topic=='합의서'):
+        prompt = f"""
+        넌 대한민국 최고의 변호사야 지금부터 '{key_topic}' 초안을 작성해줘야돼 이전 상담 내용정리하고 법률분석 한거랑 이번 상담 녹취록 그리고 PDF 내용을 기반으로 작성해.
+        {all_document_text_parts}{previous_summary_text}{transcribed_text}
+        """
     # --- End of Prompt ---
 
     # --- Outer Try-Except block for API call ---
