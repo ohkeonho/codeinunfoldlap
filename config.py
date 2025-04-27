@@ -67,7 +67,7 @@ else:
         print("✅ [Config] Gemini API 설정 시도 중...")
         genai.configure(api_key=GEMINI_API_KEY)
         # 사용 모델 확인 및 필요시 변경 ('gemini-1.5-flash-latest' 등)
-        gemini_model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        gemini_model = genai.GenerativeModel('gemini-2.0-pro-exp')
         print(f"✅ [Config] Gemini API 설정 완료. 모델: {getattr(gemini_model, 'model_name', 'N/A')}")
     except Exception as e:
         print(f"🚨 [Config] Gemini API 설정 오류: {e}")

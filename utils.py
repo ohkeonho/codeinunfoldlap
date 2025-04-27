@@ -63,7 +63,7 @@ def summarize_with_context(transcribed_text, all_document_text_parts, key_topic,
         except Exception as e_resp: print(f"🚨 [Util] 응답 처리 중 오류: {e_resp}"); summary_text = f"[오류] 응답 처리 오류: {e_resp}"
 
         if summary_text and not summary_text.startswith("[오류]"):
-            summary_text = summary_text.replace('##', '').replace('**', '').replace('*', '').strip()
+            summary_text = summary_text.replace('##', '').replace('**', '').replace('*', '').replace('/','').strip()
             return summary_text
         elif summary_text: return summary_text
         else: print(f"⚠️ [Util] 유효 텍스트 못 받음. 응답: {response}"); return "[오류] Gemini 분석 결과 없음."
@@ -100,7 +100,7 @@ def summarize_text_with_gemini(text_to_summarize):
         except Exception as e_resp: summary_text = f"[오류] 응답 처리 오류: {e_resp}"
 
         if summary_text and not summary_text.startswith("[오류]"):
-            summary_text = summary_text.replace('##', '').replace('**', '').replace('*', '').strip()
+            summary_text = summary_text.replace('##', '').replace('**', '').replace('*', '').replace('/','').strip()
             return summary_text
         elif summary_text: return summary_text
         else: print(f"⚠️ [Util] Gemini 요약 결과 없음. 응답: {response}"); return "[오류] Gemini 요약 결과 없음."
