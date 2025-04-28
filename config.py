@@ -77,6 +77,7 @@ else:
 FIREBASE_CRED_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_FIREBASE', 'parkyoun-9971d-firebase-adminsdk-fbsvc-a5c658338f.json')
 
 # --- 기타 설정 ---
+ADMIN_EMAILS = ['admin@example.com'] # 실제 관리자 이메일 목록으로 교체
 
 # --- Flask App Config (메인 파일에서 사용) ---
 # 파일 크기 제한은 보통 Flask 앱 설정에 직접 넣는 것이 일반적임
