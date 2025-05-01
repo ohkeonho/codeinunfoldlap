@@ -67,7 +67,7 @@ else:
         print("✅ [Config] Gemini API 설정 시도 중...")
         genai.configure(api_key=GEMINI_API_KEY)
         # 사용 모델 확인 및 필요시 변경 ('gemini-1.5-flash-latest' 등)
-        gemini_model = genai.GenerativeModel('gemini-2.0-pro-exp')
+        gemini_model = genai.GenerativeModel('gemini-2.5-flash-preview-04-17')
         print(f"✅ [Config] Gemini API 설정 완료. 모델: {getattr(gemini_model, 'model_name', 'N/A')}")
     except Exception as e:
         print(f"🚨 [Config] Gemini API 설정 오류: {e}")
@@ -78,7 +78,3 @@ FIREBASE_CRED_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_FIREBASE', 'parky
 
 # --- 기타 설정 ---
 ADMIN_EMAILS = ['admin@example.com'] # 실제 관리자 이메일 목록으로 교체
-
-# --- Flask App Config (메인 파일에서 사용) ---
-# 파일 크기 제한은 보통 Flask 앱 설정에 직접 넣는 것이 일반적임
-# MAX_FILE_SIZE = 50 * 1024 * 1024 # 필요하다면 여기서 정의하고 메인 파일에서 import

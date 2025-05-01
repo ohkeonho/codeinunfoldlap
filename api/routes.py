@@ -1,14 +1,17 @@
 # api/routes.py
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify,send_file
+import zipfile
 from firebase_admin import auth
 import traceback
 import os
 import tempfile
+import sys
 from werkzeug.utils import secure_filename
 from datetime import date, datetime, timezone
-
+import mimetypes
+from io import BytesIO
 # --- 분리된 모듈에서 필요한 컴포넌트 임포트 ---
-from config import PYDUB_AVAILABLE, AudioSegment # AudioSegment는 Mock 또는 실제 클래스
+from config import PYDUB_AVAILABLE, AudioSegment ,ADMIN_EMAILS# AudioSegment는 Mock 또는 실제 클래스
 from storage import user_memory_storage, admin_memory_storage
 from clients import ClovaSpeechClient
 from utils import (
@@ -120,10 +123,11 @@ def upload_file():
         print(f"DEBUG: Clova 응답 (앞 500자): {clova_response_text[:500]}")
 
         # --- 6. 임시 오디오 파일 삭제 ---
-        if temp_file_path and os.path.exists(temp_file_path):
-            try: os.remove(temp_file_path); print(f"🧹 임시 오디오 파일 삭제됨: {temp_file_path}")
-            except OSError as e: print(f"🚨 임시 오디오 파일 삭제 실패: {e}")
-        temp_file_path = None # 경로 변수 초기화
+        # 요청에 따라 임시 오디오 파일을 삭제하지 않도록 수정
+        # if temp_file_path and os.path.exists(temp_file_path):
+        #    try: os.remove(temp_file_path); print(f"🧹 임시 오디오 파일 삭제됨: {temp_file_path}")
+        #    except OSError as e: print(f"🚨 임시 오디오 파일 삭제 실패: {e}")
+        # temp_file_path = None # 경로 변수 초기화 (파일은 유지되므로 변수 초기화는 선택 사항)
 
         # --- 7. 결과 처리 및 저장 ---
         if res.status_code == 200:
@@ -156,6 +160,7 @@ def upload_file():
                 'summary': gemini_summary,
                 'source': 'upload (tempfile)', # 출처 명시
                 'timestamp': current_timestamp_iso,
+                'audio_temp_path': temp_file_path, # <--- 임시 파일 경로 저장
                 # 'uid' 필드는 이제 상위 키가 UID이므로 저장 안 함
                 'metadata': {
                     'name': name,
@@ -163,7 +168,7 @@ def upload_file():
                     'region': region,
                     'original_filename': file_object_for_clova.filename,
                     'user_email': uploader_email
-                 }
+                   }
             }
             print(f"✅ User 메모리에 저장됨 (UID: {uploader_uid}, Email: {uploader_email}, Key: {storage_key})")
             # --- ▲▲▲ 사용자 UID 기반 중첩 저장 ▲▲▲ ---
@@ -176,7 +181,8 @@ def upload_file():
                 'storage_key':storage_key,
                 'original_text':transcribed_text, # 프론트에서 즉시 필요시 반환
                 'summary':gemini_summary,
-                'user_email': uploader_email        # 프론트에서 즉시 필요시 반환
+                'user_email': uploader_email,     # 프론트에서 즉시 필요시 반환
+                'audio_temp_path': temp_file_path # <--- 임시 파일 경로 반환 (디버그/확인용)
             }), 200
         else:
             # Clova API 실패 처리
@@ -187,20 +193,21 @@ def upload_file():
         # --- 전체 예외 처리 ---
         print(f"🚨 예외 발생 (upload): {e}"); print(traceback.format_exc())
 
-        # 임시 오디오 파일 정리
-        if temp_file_path and os.path.exists(temp_file_path):
-            try: os.remove(temp_file_path); print(f"🧹 오류로 임시 오디오 삭제: {temp_file_path}")
-            except OSError as e_rem: print(f"🚨 오류 시 임시 오디오 삭제 실패: {e_rem}")
+        # 요청에 따라 임시 오디오 파일은 오류 발생 시에도 삭제하지 않도록 수정
+        # if temp_file_path and os.path.exists(temp_file_path):
+        #    try: os.remove(temp_file_path); print(f"🧹 오류로 임시 오디오 삭제: {temp_file_path}")
+        #    except OSError as e_rem: print(f"🚨 오류 시 임시 오디오 삭제 실패: {e_rem}")
 
         # --- ▼▼▼ 중첩 구조 메모리 정리 ▼▼▼ ---
+        # 오류 발생 시 메모리에 불완전하게 저장된 데이터가 있다면 정리
         if uploader_uid and storage_key and uploader_uid in user_memory_storage and storage_key in user_memory_storage[uploader_uid]:
             try:
                 del user_memory_storage[uploader_uid][storage_key]
-                print(f"🧹 오류로 User 메모리 삭제 (UID: {uploader_uid}, Key: {storage_key})")
+                print(f"🧹 오류로 User 메모리 데이터 삭제 (UID: {uploader_uid}, Key: {storage_key})")
                 # 해당 사용자 데이터가 모두 삭제되어 폴더가 비었는지 확인 후 폴더 자체 삭제 (선택적)
                 if not user_memory_storage[uploader_uid]:
                     del user_memory_storage[uploader_uid]
-                    print(f"🧹 빈 사용자 폴더 삭제됨 (UID: {uploader_uid})")
+                    print(f"🧹 오류로 빈 사용자 폴더 삭제됨 (UID: {uploader_uid})")
             except KeyError:
                  print(f"🧹 오류 발생 시 메모리 정리 중 Key 이미 없음 (UID: {uploader_uid}, Key: {storage_key})")
         # --- ▲▲▲ 중첩 구조 메모리 정리 ▲▲▲ ---
@@ -212,7 +219,6 @@ def record_audio():
     """웹 녹음 처리 (WebM->WAV->STT->요약-> user_memory_storage 저장) + ID 토큰 인증 (필수)"""
     global user_memory_storage
     temp_webm_path, temp_wav_path, storage_key = None, None, None
-    # id_token = None # id_token 변수는 검증 후 사용하지 않으므로 제거 가능
     uploader_uid = None # 항상 UID를 얻어야 함
     uploader_email = '이메일 정보 없음'
     try:
@@ -246,7 +252,8 @@ def record_audio():
         # 이 시점 이후에는 uploader_uid 가 항상 유효한 값이어야 함
 
         # --- 라이브러리 및 입력 유효성 검사 ---
-        if not PYDUB_AVAILABLE:
+        # PYDUB_AVAILABLE 이 정의되어 있고 False인지 확인
+        if 'PYDUB_AVAILABLE' in globals() and not PYDUB_AVAILABLE:
             # 실제 운영에서는 서버 시작 시점에 확인하거나, 에러 발생 시 로깅 후 500 반환
             print("🚨 /record: pydub 라이브러리를 사용할 수 없습니다.")
             return jsonify({'error': '서버 설정 오류 (오디오 처리 불가)'}), 500
@@ -284,23 +291,24 @@ def record_audio():
                 print(f"✅ 임시 WAV 생성: {temp_wav_path}")
         except Exception as e:
             print(f"🚨 /record: WebM -> WAV 변환 실패: {e}")
-            # 변환 실패 시 관련 임시 파일 정리 후 오류 반환
-            if temp_webm_path and os.path.exists(temp_webm_path):
-                try: os.remove(temp_webm_path); print(f"🧹 (변환실패) 임시 WebM 삭제: {temp_webm_path}")
-                except OSError as e_rem: print(f"🚨 (변환실패) 임시 WebM 삭제 실패: {e_rem}")
+            # 변환 실패 시 관련 임시 파일 정리 로직 제거 (요청에 따라 파일을 남김)
+            # if temp_webm_path and os.path.exists(temp_webm_path):
+            #     try: os.remove(temp_webm_path); print(f"🧹 (변환실패) 임시 WebM 삭제: {temp_webm_path}")
+            #     except OSError as e_rem: print(f"🚨 (변환실패) 임시 WebM 삭제 실패: {e_rem}")
             return jsonify({'error': '오디오 파일 변환 실패', 'detail': str(e)}), 500
         finally:
-            # 변환 성공/실패 여부와 관계없이 원본 임시 WebM은 삭제
-            if temp_webm_path and os.path.exists(temp_webm_path):
-                try: os.remove(temp_webm_path); print(f"🧹 원본 임시 WebM 삭제: {temp_webm_path}")
-                except OSError as e: print(f"🚨 임시 WebM 삭제 실패: {e}")
-            temp_webm_path = None # 경로 변수 초기화
+            # 변환 성공/실패 여부와 관계없이 원본 임시 WebM은 삭제 -> 요청에 따라 삭제 로직 제거
+            # if temp_webm_path and os.path.exists(temp_webm_path):
+            #     try: os.remove(temp_webm_path); print(f"🧹 원본 임시 WebM 삭제: {temp_webm_path}")
+            #     except OSError as e: print(f"🚨 임시 WebM 삭제 실패: {e}")
+            # temp_webm_path = None # 경로 변수 초기화 (파일은 유지되므로 변수 초기화는 선택 사항)
+            pass # 파일 삭제 로직을 제거했으므로 finally에서 할 일 없음
 
-        # 변환된 WAV 파일 존재 확인
-        if not temp_wav_path or not os.path.exists(temp_wav_path):
-            # 이 경우는 위의 finally 블록 때문에 발생하기 어려우나 방어적으로 추가
-            print("🚨 /record: WAV 변환 후 파일이 존재하지 않음.")
-            return jsonify({'error': 'WAV 변환 알 수 없는 오류'}), 500
+        # 변환된 WAV 파일 존재 확인 (삭제 로직을 제거했으므로 이 코드는 필요 없어짐)
+        # if not temp_wav_path or not os.path.exists(temp_wav_path):
+        #     # 이 경우는 위의 finally 블록 때문에 발생하기 어려우나 방어적으로 추가
+        #     print("🚨 /record: WAV 변환 후 파일이 존재하지 않음.")
+        #     return jsonify({'error': 'WAV 변환 알 수 없는 오류'}), 500
 
         # 디버그 로그 (임시 WAV)
         try: print(f"DEBUG: Clova 전송 WAV: {temp_wav_path}, 크기: {os.path.getsize(temp_wav_path)} bytes")
@@ -315,10 +323,11 @@ def record_audio():
         print(f"DEBUG: Clova 응답 (녹음, 앞 500자): {clova_response_text[:500]}")
 
         # --- 임시 WAV 삭제 ---
-        if temp_wav_path and os.path.exists(temp_wav_path):
-            try: os.remove(temp_wav_path); print(f"🧹 임시 WAV 삭제: {temp_wav_path}")
-            except OSError as e: print(f"🚨 임시 WAV 삭제 실패: {e}")
-        temp_wav_path = None # 경로 변수 초기화
+        # 요청에 따라 임시 WAV 파일을 삭제하지 않도록 수정
+        # if temp_wav_path and os.path.exists(temp_wav_path):
+        #    try: os.remove(temp_wav_path); print(f"🧹 임시 WAV 삭제: {temp_wav_path}")
+        #    except OSError as e: print(f"🚨 임시 WAV 삭제 실패: {e}")
+        # temp_wav_path = None # 경로 변수 초기화 (파일은 유지되므로 변수 초기화는 선택 사항)
 
         # --- 결과 처리 및 저장 ---
         if res.status_code == 200:
@@ -349,6 +358,8 @@ def record_audio():
                 'summary': gemini_summary,
                 'source': 'record (tempfile)', # 출처 명시 (녹음)
                 'timestamp': current_timestamp_iso,
+                'audio_temp_webm_path': temp_webm_path, # <--- 임시 WebM 파일 경로 저장
+                'audio_temp_wav_path': temp_wav_path,   # <--- 임시 WAV 파일 경로 저장
                 # 'uid'는 상위 키, 'id_token'은 저장 안 함
                 'metadata': {
                     'name': name,
@@ -367,7 +378,9 @@ def record_audio():
                 'storage_key':storage_key,
                 'original_text':transcribed_text,
                 'summary':gemini_summary,
-                'user_email': uploader_email
+                'user_email': uploader_email,
+                'audio_temp_webm_path': temp_webm_path, # <--- 임시 파일 경로 반환 (디버그/확인용)
+                'audio_temp_wav_path': temp_wav_path    # <--- 임시 파일 경로 반환 (디버그/확인용)
             }), 200
         else:
             # Clova API 실패 처리
@@ -378,19 +391,21 @@ def record_audio():
     except Exception as e:
         print(f"🚨 예외 발생 (record): {e}"); print(traceback.format_exc())
 
-        # 임시 파일 정리 (WebM, WAV) - 순서 무관
-        if temp_webm_path and os.path.exists(temp_webm_path):
-            try: os.remove(temp_webm_path); print(f"🧹 오류로 임시 WebM 삭제: {temp_webm_path}")
-            except OSError as e_rem: print(f"🚨 오류 시 임시 WebM 삭제 실패: {e_rem}")
-        if temp_wav_path and os.path.exists(temp_wav_path):
-            try: os.remove(temp_wav_path); print(f"🧹 오류로 임시 WAV 삭제: {temp_wav_path}")
-            except OSError as e_rem: print(f"🚨 오류 시 임시 WAV 삭제 실패: {e_rem}")
+        # 임시 파일 정리 (WebM, WAV) - 오류 발생 시에도 삭제하지 않도록 수정
+        # if temp_webm_path and os.path.exists(temp_webm_path):
+        #     try: os.remove(temp_webm_path); print(f"🧹 오류로 임시 WebM 삭제: {temp_webm_path}")
+        #     except OSError as e_rem: print(f"🚨 오류 시 임시 WebM 삭제 실패: {e_rem}")
+        # if temp_wav_path and os.path.exists(temp_wav_path):
+        #     try: os.remove(temp_wav_path); print(f"🧹 오류로 임시 WAV 삭제: {temp_wav_path}")
+        #     except OSError as e_rem: print(f"🚨 오류 시 임시 WAV 삭제 실패: {e_rem}")
+        pass # 파일 삭제 로직을 제거했으므로 예외 처리에서 할 일 없음
 
         # --- ▼▼▼ 중첩 구조 메모리 정리 (/upload와 동일 방식) ▼▼▼ ---
+        # 오류 발생 시 메모리에 불완전하게 저장된 데이터가 있다면 정리
         if uploader_uid and storage_key and uploader_uid in user_memory_storage and storage_key in user_memory_storage[uploader_uid]:
             try:
                 del user_memory_storage[uploader_uid][storage_key]
-                print(f"🧹 오류로 User 메모리 삭제 (UID: {uploader_uid}, Key: {storage_key}, Source: /record)")
+                print(f"🧹 오류로 User 메모리 데이터 삭제 (UID: {uploader_uid}, Key: {storage_key}, Source: /record)")
                 # 해당 사용자 데이터가 모두 삭제되어 폴더가 비었는지 확인 후 폴더 자체 삭제 (선택적)
                 if not user_memory_storage[uploader_uid]:
                     del user_memory_storage[uploader_uid]
@@ -404,565 +419,895 @@ def record_audio():
 @api_bp.route("/admin/upload", methods=['POST'])
 def admin_upload_route_logic():
     """
-    관리 인터페이스에서의 파일 업로드 처리.
-    관리자 인증 후, 파일 분석 결과를 업로드 수행자의 UID를 primary key로 사용하여
-    user_memory_storage에 저장.
+    관리 인터페이스 파일 업로드 처리. 인증 후 파일 분석.
+    PDF/JPG 문서는 ZIP으로 압축하여 저장 정보 관리.
     """
-    # 사용할 전역 저장소 명시 (실제 운영에서는 DB 사용 권장)
     global user_memory_storage
-    # complaint_storage 등 다른 저장소는 사용하지 않도록 수정되었습니다.
 
-    storage_key = None # UserMemory 내 2차 키 (데이터 식별용)
-    uploaded_file_metadata_simple = [] # 업로드 파일 정보 요약
-    id_token = None
-    uploader_uid = None # 업로드 수행자의 UID (관리자 본인)
-    uploader_email = '업로더 이메일 정보 없음' # 업로드 수행자의 이메일
-    # 대상 의뢰인 정보는 metadata에 저장
+    # 초기 변수 설정
+    storage_key = None
+    uploader_uid = None
+    uploader_email = '업로더 이메일 정보 없음'
     client_email_target = None
     target_name = None
     target_phone = None
     target_region = None
     key_topic = None
-
-    # storage_target_name = None # user_memory_storage만 사용하므로 필요 없음
-    success_flag = False # 데이터 저장 성공 플래그
-    temp_audio_path = None # 임시 오디오 파일 경로
-    temp_doc_paths = [] # 임시 문서 파일 경로 리스트
+    success_flag = False
+    processed_files_full_metadata = [] # 최종 파일 메타데이터 리스트
+    temp_files_to_clean = [] # finally에서 '상태 확인'할 임시 파일 경로 리스트
+    files_to_zip = [] # ZIP으로 묶을 파일 정보 (temp_path, original_filename)
+    other_document_files_metadata = [] # ZIP에 포함되지 않는 문서 파일 메타데이터
+    document_details_for_ocr = [] # 모든 문서 파일의 OCR 처리용 정보 (추출 후 ZIP 처리)
+    temp_files_zipped_and_removed = set() # ZIP에 포함 후 즉시 삭제된 파일 경로 추적용
 
     print(f"--- '/admin/upload' 요청 처리 시작 ---")
 
     try:
-        # --- ▼▼▼ ID 토큰 확인 및 UID, 이메일 얻기 (업로드 수행자 인증) ▼▼▼ ---
-        # 이 로직은 업로드를 수행하는 관리자 사용자의 인증을 확인합니다.
+        # --- 인증 및 업로더 정보 획득 ---
+        # (기존 코드와 동일)
         auth_header = request.headers.get('Authorization')
-        if auth_header and auth_header.startswith('Bearer '):
-            id_token = auth_header.split('Bearer ')[1]
-
-        if not id_token:
-            print("🚨 /admin/upload: Authorization 헤더 없거나 Bearer 토큰 아님. 인증 실패.")
-            return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+        id_token = None
+        if auth_header and auth_header.startswith('Bearer '): id_token = auth_header.split('Bearer ')[1]
+        if not id_token: return jsonify({"error": "인증 토큰 필요"}), 401
         try:
-            # auth 객체가 초기화되어 있어야 함 (Firebase Admin SDK)
             decoded_token = auth.verify_id_token(id_token)
-            uploader_uid = decoded_token['uid'] # 업로드 수행자(관리자)의 UID 획득
-            uploader_email = decoded_token.get('email', '업로더 이메일 정보 없음') # 이메일 클레임 가져오기
-
+            uploader_uid = decoded_token['uid']
+            uploader_email = decoded_token.get('email', uploader_email)
             print(f"ℹ️ /admin/upload 요청 수행자 UID: {uploader_uid}, Email: {uploader_email}")
-            # TODO: 관리자 Role 확인 로직이 필요하다면 이 시점에서 추가해야 합니다.
-            # 예: if not is_admin(uploader_uid): return jsonify({"error": "관리자 권한이 필요합니다."}), 403
-
-        except auth.InvalidIdTokenError as e:
-            print(f"🚨 /admin/upload: 유효하지 않은 ID 토큰: {e}")
-            return jsonify({"error": "유효하지 않은 인증 토큰입니다.", "detail": str(e)}), 401
         except Exception as e:
-            print(f"🚨 /admin/upload: 업로더 토큰 검증 오류: {e}")
-            traceback.print_exc()
-            return jsonify({"error": "업로더 토큰 검증 중 서버 오류 발생", "detail": str(e)}), 500
-        # --- ▲▲▲ ID 토큰 확인 및 UID, 이메일 얻기 ▲▲▲ ---
+            print(f"🚨 /admin/upload: 토큰 검증 오류: {e}")
+            return jsonify({"error": "토큰 검증 오류", "detail": str(e)}), 401
 
-
-        # --- 1. 입력 파라미터 및 파일 확인 ---
-        # 대상 의뢰인 정보 및 문서 종류(key_topic) 확인
-        client_email_target = request.form.get('clientEmail', '').strip() # 대상 의뢰인 이메일 (필요시 메타데이터에 저장)
+        # --- 1. 폼 데이터 및 파일 확인 ---
+        # (기존 코드와 동일)
+        client_email_target = request.form.get('clientEmail', '').strip()
         target_name = request.form.get('name', '').strip()
         target_phone = request.form.get('phone', '').strip()
         target_region = request.form.get('region', '').strip()
-        key_topic = request.form.get('key', '').strip() # 문서 종류 (고소장, 보충 등)
+        key_topic = request.form.get('key', '').strip()
 
-        # 필수 입력 항목 체크 (업로드 수행자의 정보나 파일 관련 항목이 필수일 수 있음)
-        # 여기서는 key (문서 종류)와 파일들이 필수라고 가정합니다.
-        required_form_fields = {
-             'key': '문서 종류 (key)'
-             # 'name': '이름', 'phone': '전화번호', 'region': '지역', 'clientEmail': '대상 의뢰인 이메일' # 이 항목들은 필수 여부에 따라 포함
-        }
-        # 실제로 폼에서 받아와서 키 생성 등에 사용되는 필드들을 모두 체크하는 것이 좋습니다.
-        fields_for_key_generation = {
-            'name': target_name,
-            'phone': target_phone,
-            'region': target_region,
-            'clientEmail': client_email_target, # 키 생성에 대상 의뢰인 이메일 사용
-            'key': key_topic
-        }
-        missing_fields_for_key = [desc for field, value in fields_for_key_generation.items() for req_field, desc in required_form_fields.items() if field == req_field and not value]
-
-        if missing_fields_for_key:
-             print(f"🚨 키 생성에 필요한 필수 입력 누락: {', '.join(missing_fields_for_key)}")
-             return jsonify({'error': f'키 생성에 필요한 필수 입력 항목이 누락되었습니다: {", ".join(missing_fields_for_key)}'}), 400
-
-
-        # 파일 업로드 확인
+        if not key_topic: return jsonify({'error': '필수 입력 누락: 문서 종류(key)'}), 400
         if 'audioFile' not in request.files or not request.files['audioFile'].filename:
-            print("🚨 오디오 파일 누락 또는 유효하지 않음")
-            return jsonify({'error': '오디오 파일(audioFile) 필요'}), 400
+             return jsonify({'error': '오디오 파일(audioFile) 필요'}), 400
         audio_file = request.files['audioFile']
-
         document_files = request.files.getlist('documentFiles')
         if not document_files or not any(f.filename for f in document_files):
-            print("🚨 문서 파일 누락 또는 유효하지 않음")
-            return jsonify({'error': '하나 이상의 문서 파일(documentFiles) 필요'}), 400
+             return jsonify({'error': '하나 이상의 문서 파일(documentFiles) 필요'}), 400
 
-        # --- 1-1. 대상 의뢰인 UID 조회 로직은 이제 필요 없습니다. (저장 시 업로더 UID 사용) ---
-        # 데이터를 저장할 Primary Key는 업로더 UID (uploader_uid)입니다.
-
-
-        # --- 2. Storage Key 생성 (조회 시 사용될 2차 키) ---
-        # 이 키는 user_memory_storage[uploader_uid] 딕셔너리 안에서 데이터를 식별하는 키가 됩니다.
-        # 키 생성 시 대상 의뢰인 정보 및 문서 종류 포함 (정보 식별을 위해)
+        # --- 2. Storage Key 생성 ---
+        # (기존 코드와 동일)
         safe_name = sanitize_filename(target_name)
         safe_phone = sanitize_filename(target_phone)
         safe_region = sanitize_filename(target_region)
-        # sanitize_filename 함수가 이메일도 안전하게 처리하도록 구현 필요
-        safe_client_email_for_key = sanitize_filename(client_email_target) # 대상 의뢰인 이메일 사용 (키에 포함)
-
-        # 키 생성 시 key_topic 및 의뢰인 이메일 포함하여 명확성 높임
-        # 키 포맷: {이름}_{전화번호}_{지역}_{의뢰인이메일}_{날짜}_admin_{토픽}_{시간+마이크로초}
-        base_file_name_prefix = f"{safe_name}_{safe_phone}_{safe_region}_{safe_client_email_for_key}_{str(date.today())}_admin_{key_topic}"
-        storage_key = f"{base_file_name_prefix}_{datetime.now().strftime('%H%M%S%f')}"
+        safe_client_email_for_key = sanitize_filename(client_email_target)
+        safe_uploader_email_for_key = sanitize_filename(uploader_email)
+        current_datetime_str = datetime.now().strftime('%Y%m%d_%H%M%S%f')
+        storage_key = f"{safe_name}_{safe_phone}_{safe_region}_{safe_client_email_for_key}_{current_datetime_str}_admin_{sanitize_filename(key_topic)}"
         print(f"ℹ️ 생성된 Storage Key (2차 키): {storage_key} (Topic: {key_topic}, Target Email: {client_email_target}, Uploader: {uploader_email})")
 
 
-        # --- 3. 파일 임시 처리 및 메타데이터 기록 ---
-        audio_filename_secure = secure_filename(audio_file.filename)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_filename_secure)[1]) as temp_audio:
-            audio_file.save(temp_audio.name); temp_audio_path = temp_audio.name
-            audio_size = os.path.getsize(temp_audio_path)
-            uploaded_file_metadata_simple.append({'type': 'audio', 'original_filename': audio_filename_secure, 'size': audio_size})
-            print(f"✅ [AdminRoute] 오디오 임시 저장: {temp_audio_path} ({audio_size} bytes)")
+        # --- 3. 파일 임시 저장 및 메타데이터 기록 (오디오) ---
+        # (기존 코드와 동일)
+        temp_audio_path = None
+        audio_original_filename = secure_filename(audio_file.filename)
+        audio_processed_filename = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_original_filename)[1]) as temp_audio:
+                audio_file.save(temp_audio.name)
+                temp_audio_path = temp_audio.name
+                temp_files_to_clean.append(temp_audio_path) # 정리 목록에 추가
+                audio_processed_filename = os.path.basename(temp_audio_path)
+                audio_size = os.path.getsize(temp_audio_path)
+                audio_type, _ = mimetypes.guess_type(temp_audio_path)
+                if not audio_type: audio_type = 'application/octet-stream'
 
-        document_details_for_ocr = []
+                # 오디오 파일 메타데이터 저장
+                processed_files_full_metadata.append({
+                    'type': 'audio',
+                    'original_filename': audio_original_filename,
+                    'processed_filename': audio_processed_filename,
+                    'temp_path': temp_audio_path,
+                    'size': audio_size,
+                    'mime_type': audio_type
+                })
+                print(f"✅ [AdminUpload] 오디오 임시 저장: {temp_audio_path} ({audio_size} bytes)")
+        except Exception as audio_save_err:
+            print(f"🚨 [AdminUpload] 오디오 파일 저장 오류: {audio_save_err}")
+            # 필요 시 여기서 중단 결정
+            # return jsonify({"error": f"오디오 파일 저장 오류: {audio_save_err}"}), 500
+
+
+        # --- 4. 문서 파일 임시 저장 & ★ OCR 정보 수집 ★ ---
+        print(f"⏳ [AdminUpload] {len(document_files)}개 문서 파일 임시 저장 및 OCR 대상 분류 시작...")
         for i, doc_file in enumerate(document_files):
             if doc_file and doc_file.filename:
-                doc_filename_secure = secure_filename(doc_file.filename)
-                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(doc_filename_secure)[1]) as temp_doc:
-                    doc_file.save(temp_doc.name); temp_doc_path = temp_doc.name
-                    temp_doc_paths.append(temp_doc_path) # 임시 파일 경로 리스트에 추가 (finally에서 삭제용)
-                    doc_size = os.path.getsize(temp_doc_path)
-                    uploaded_file_metadata_simple.append({'type': 'document', 'original_filename': doc_filename_secure, 'size': doc_size})
-                    document_details_for_ocr.append({'filename': doc_filename_secure, 'temp_path': temp_doc_path}) # OCR 처리를 위해 파일 정보 저장
-                    print(f"✅ [AdminRoute] 문서 임시 저장 ({i+1}): {temp_doc_path} ({doc_size} bytes)")
+                original_doc_filename = secure_filename(doc_file.filename)
+                doc_processed_filename = None
+                doc_temp_path = None
+                try:
+                    # 모든 문서 파일을 일단 임시 저장
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(original_doc_filename)[1]) as temp_doc:
+                         doc_file.save(temp_doc.name)
+                         doc_temp_path = temp_doc.name
+                         # ★ 중요: 아직 정리 목록(temp_files_to_clean)에 추가하지 않음. ZIP 처리 후 결정
+                         doc_processed_filename = os.path.basename(doc_temp_path)
+                         doc_size = os.path.getsize(doc_temp_path)
+                         doc_type, _ = mimetypes.guess_type(doc_temp_path)
+                         if not doc_type: doc_type = 'application/octet-stream'
 
+                         print(f"✅ [AdminUpload] 문서 임시 저장 ({i+1}): {original_doc_filename} -> {doc_temp_path} ({doc_size} bytes)")
 
-        # --- 4. Clova STT ---
+                         # ★ 모든 문서에 대해 OCR/텍스트 추출 정보 추가 ★
+                         document_details_for_ocr.append({
+                             'original_filename': original_doc_filename,
+                             'temp_path': doc_temp_path,
+                             'processed_filename': doc_processed_filename, # 필요 시 사용
+                             'size': doc_size,                            # 필요 시 사용
+                             'mime_type': doc_type                         # 필요 시 사용
+                         })
+
+                         # ★ PDF/JPG 파일 분류 ★
+                         file_ext = os.path.splitext(original_doc_filename)[1].lower()
+                         # MIME 타입으로도 확인 가능: if doc_type in ['application/pdf', 'image/jpeg']:
+                         if file_ext in ['.pdf', '.jpg', '.jpeg']:
+                             files_to_zip.append({'temp_path': doc_temp_path, 'original_filename': original_doc_filename})
+                             print(f"  ->  분류: ZIP 대상 ({original_doc_filename})")
+                         else:
+                             # PDF/JPG가 아닌 파일은 메타데이터를 바로 other_document_files_metadata 에 추가
+                             other_document_files_metadata.append({
+                                 'type': 'document',
+                                 'original_filename': original_doc_filename,
+                                 'processed_filename': doc_processed_filename,
+                                 'temp_path': doc_temp_path,
+                                 'size': doc_size,
+                                 'mime_type': doc_type
+                             })
+                             temp_files_to_clean.append(doc_temp_path) # 정리 목록에 추가
+                             print(f"  -> 분류: 개별 유지 대상 ({original_doc_filename})")
+
+                except Exception as doc_save_err:
+                    print(f"🚨 [AdminUpload] 문서 '{original_doc_filename}' 임시 저장 오류: {doc_save_err}")
+                    # 오류 발생 시 해당 파일 처리 건너뛰기 또는 전체 중단 등 결정
+
+        # --- 5. Clova STT ---
+        # (기존 코드와 동일 - 오디오 처리 결과 사용)
         transcribed_text = "[STT 결과 없음]"
-        if temp_audio_path and os.path.exists(temp_audio_path): # 파일 존재 여부 재확인
-            print(f"⏳ [AdminRoute] Clova STT 요청 시작 (파일: {os.path.basename(temp_audio_path)})...") # 파일명만 로깅
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            print(f"⏳ [AdminUpload] Clova STT 요청 시작 (파일: {os.path.basename(temp_audio_path)})...")
             try:
-                # ClovaSpeechClient 클래스가 정의되어 있고 사용 준비가 되어 있어야 합니다.
                 clova_client = ClovaSpeechClient()
                 res = clova_client.req_upload(file=temp_audio_path, completion='sync', diarization=True)
-                print(f"✅ [AdminRoute] Clova 상태코드: {res.status_code}")
+                print(f"✅ [AdminUpload] Clova 상태코드: {res.status_code}")
                 if res.status_code == 200:
-                    result_data = res.json();
-                    # Clova 응답 구조에 따라 텍스트 추출 로직 조정
+                    result_data = res.json()
                     if 'segments' in result_data and result_data['segments']:
-                        # 화자 분리 정보가 있는 경우
                         texts_by_speaker = [f"화자 {s.get('speaker',{}).get('label','?')}: {s.get('text','')}" for s in result_data['segments']]
                         transcribed_text = "\n".join(texts_by_speaker)
-                    elif 'text' in result_data:
-                        # 전체 텍스트만 있는 경우
-                        transcribed_text = result_data.get('text','변환된 텍스트 없음')
-                    else:
-                        transcribed_text = 'Clova 응답에 텍스트 데이터 없음'
-                    print(f"✅ [AdminRoute] Clova STT 결과 처리 완료")
+                    elif 'text' in result_data: transcribed_text = result_data.get('text','변환된 텍스트 없음')
+                    else: transcribed_text = 'Clova 응답에 텍스트 데이터 없음'
+                    print(f"✅ [AdminUpload] Clova STT 결과 처리 완료")
                 else:
-                    transcribed_text = f"[Clova STT 실패: 상태코드 {res.status_code}]"; print(f"🚨 [AdminRoute] Clova STT 실패 ({res.status_code})")
+                    transcribed_text = f"[Clova STT 실패: {res.status_code}, {res.text}]"; print(f"🚨 [AdminUpload] Clova STT 실패")
             except Exception as clova_err:
-                transcribed_text = f"[Clova API 오류: {clova_err}]"; print(f"🚨 [AdminRoute] Clova API 호출 오류: {clova_err}")
-                traceback.print_exc() # API 호출 오류 시 트레이스백 출력
-        else:
-            print("⚠️ [AdminRoute] 오디오 파일 처리 안됨 또는 임시 파일 없음, STT 건너김.")
-        # 오디오 임시 파일 삭제는 finally 블록에서 일괄 처리
+                transcribed_text = f"[Clova API 오류: {clova_err}]"; print(f"🚨 [AdminUpload] Clova API 오류")
+        else: print("⚠️ [AdminUpload] 오디오 파일 처리 안됨, STT 건너김.")
 
 
-        # --- 5. 문서 텍스트 추출 (OCR 등 활용) ---
+        # --- 6. 문서 텍스트 추출 (OCR 등) ---
+        # ★ 이제 document_details_for_ocr 에는 모든 문서 정보가 들어있음 ★
         all_document_text_parts = []
-        print(f"⏳ [AdminRoute] {len(document_details_for_ocr)}개 문서 텍스트 추출 시작...")
-        ocr_error_flag = False # OCR 오류 발생 여부 플래그
-
-        # document_details_for_ocr 리스트는 3번 스텝에서 이미 채워져 있습니다.
+        print(f"⏳ [AdminUpload] {len(document_details_for_ocr)}개 문서 텍스트 추출 시작...")
+        ocr_error_flag = False
         for doc_detail in document_details_for_ocr:
             extracted_text = "[문서 텍스트 추출 실패]"
             doc_temp_path = doc_detail.get('temp_path')
-            doc_filename = doc_detail.get('filename')
-
-            if doc_temp_path and os.path.exists(doc_temp_path) and doc_filename:
+            original_filename = doc_detail.get('original_filename')
+            if doc_temp_path and os.path.exists(doc_temp_path) and original_filename:
                 try:
-                    # extract_text_from_file 함수 정의 및 구현 필요 (파일 경로를 받아 텍스트 반환)
-                    extracted_text = extract_text_from_file(original_filename=doc_filename, file_path=doc_temp_path)
-                    print(f"✅ [AdminRoute] 문서 '{doc_filename}' 텍스트 추출 완료")
+                    # ★ 추출 함수 호출은 동일 ★
+                    extracted_text = extract_text_from_file(original_filename=original_filename, file_path=doc_temp_path)
+                    print(f"✅ [AdminUpload] 문서 '{original_filename}' 텍스트 추출 완료 (추후 ZIP 포함 여부와 별개)")
                 except Exception as ocr_err:
-                    print(f"🚨 [AdminRoute] 문서 '{doc_filename}' 텍스트 추출 오류: {ocr_err}")
-                    traceback.print_exc()
-                    ocr_error_flag = True
+                    print(f"🚨 [AdminUpload] 문서 '{original_filename}' 추출 오류: {ocr_err}")
+                    ocr_error_flag = True # 추출 실패 플래그
             else:
-                # 경로/파일명 없음 로그 (3번 스텝에서 이미 경고 로그가 나왔을 수 있음)
-                print(f"⚠️ [AdminRoute] 문서 텍스트 추출 건너김: 임시 파일 경로 또는 파일명 누락 ({doc_filename or '파일명 정보 없음'})")
-                ocr_error_flag = True # 파일 처리가 제대로 안 된 것도 오류로 간주
+                print(f"⚠️ [AdminUpload] 문서 추출 건너김: 임시 경로/파일명 누락 또는 파일 없음 ({original_filename})")
+                ocr_error_flag = True # 추출 실패 플래그 (파일 자체가 문제인 경우)
 
-            # 결과 통합 시에도 doc_filename 사용
-            all_document_text_parts.append(f"--- 문서 시작: {doc_filename or '알수없는 파일'} ---\n{extracted_text}\n--- 문서 끝: {doc_filename or '알수없는 파일'} ---")
-
-        # 문서 임시 파일 삭제는 finally 블록에서 일괄 처리
+            # ★ 추출된 텍스트 저장 (성공/실패 메시지 포함) ★
+            all_document_text_parts.append(f"--- 문서 시작: {original_filename} ---\n{extracted_text}\n--- 문서 끝: {original_filename} ---")
 
 
-        # --- 6. 이전 요약 검색 (선택 사항) ---
-        # find_previous_summary_content 함수 정의 필요
-        # 이 로직은 업로더의 user_memory_storage[uploader_uid] 내에서
-        # 대상 의뢰인 정보 (이름, 전화번호 등)를 기반으로 이전 요약을 검색해야 합니다.
-        previous_summary_text = find_previous_summary_content(target_name, target_phone, target_region) or "[이전 요약 없음]"
+        # --- 7. ★ PDF/JPG 파일 ZIP 압축 ★ ---
+        zip_temp_path = None
+        if files_to_zip: # ZIP할 파일이 있을 경우에만 실행
+            print(f"⏳ [AdminUpload] {len(files_to_zip)}개의 PDF/JPG 파일을 ZIP으로 압축 시작...")
+            try:
+                # 임시 ZIP 파일 생성
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.zip', prefix=f"{storage_key}_docs_") as temp_zip:
+                    zip_temp_path = temp_zip.name
+
+                # ZIP 파일 쓰기
+                with zipfile.ZipFile(zip_temp_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for file_info in files_to_zip:
+                        # arcname=원본 파일명으로 ZIP 내부에 저장
+                        zipf.write(file_info['temp_path'], arcname=file_info['original_filename'])
+                        print(f"  -> 압축 추가: {file_info['original_filename']} (from: {file_info['temp_path']})")
+
+                zip_size = os.path.getsize(zip_temp_path)
+                zip_original_filename = f"{storage_key}_documents.zip" # ZIP 파일의 대표 이름
+                zip_processed_filename = os.path.basename(zip_temp_path)
+
+                # ★ ZIP 파일 메타데이터 생성 ★
+                zip_metadata = {
+                    'type': 'document_archive', # 타입 구분: 문서 아카이브
+                    'original_filename': zip_original_filename,
+                    'processed_filename': zip_processed_filename,
+                    'temp_path': zip_temp_path,
+                    'size': zip_size,
+                    'mime_type': 'application/zip',
+                    'contained_files': [f['original_filename'] for f in files_to_zip] # 포함된 파일 목록 (선택적)
+                }
+                # ★ 최종 메타데이터 리스트에 ZIP 정보 추가 ★
+                processed_files_full_metadata.append(zip_metadata)
+                temp_files_to_clean.append(zip_temp_path) # ZIP 임시 파일도 정리 대상에 추가
+                print(f"✅ [AdminUpload] ZIP 파일 생성 완료: {zip_temp_path} ({zip_size} bytes)")
+
+                # (선택적) ZIP에 포함된 원본 임시 파일들 삭제
+                print(f"ℹ️ ZIP에 포함된 개별 임시 파일 삭제 시도...")
+                for file_info in files_to_zip:
+                    try:
+                        os.remove(file_info['temp_path'])
+                        temp_files_zipped_and_removed.add(file_info['temp_path']) # 삭제된 파일 추적
+                        print(f"  -> 임시 파일 삭제됨: {file_info['temp_path']}")
+                    except OSError as e_rem_zip:
+                        print(f"🚨 ZIP 포함 파일 삭제 오류: {e_rem_zip} (파일: {file_info['temp_path']})")
+
+            except Exception as zip_err:
+                print(f"🚨 [AdminUpload] ZIP 파일 생성 중 오류: {zip_err}")
+                # ZIP 생성 실패 시, 개별 파일 메타데이터를 대신 사용할지 결정 필요
+                # 여기서는 일단 에러 로그만 남기고 진행 (개별 PDF/JPG 정보는 저장 안 됨)
+                # 필요하다면 files_to_zip 내용을 other_document_files_metadata 처럼 처리하는 로직 추가
+
+        # ★ ZIP되지 않은 다른 문서 파일들의 메타데이터를 최종 리스트에 추가 ★
+        processed_files_full_metadata.extend(other_document_files_metadata)
+
+
+        # --- 8. 이전 요약 검색 ---
+        # (기존 코드와 동일)
+        previous_summary_text = find_previous_summary_content(uploader_uid, target_name, target_phone, target_region) or "[이전 요약 없음]"
         print(f"ℹ️ 이전 요약 검색 결과: {'찾음' if previous_summary_text != '[이전 요약 없음]' else '없음'}")
 
 
-        # --- 7. Gemini 분석 ---
-        # summarize_with_context 함수 정의 및 Gemini API 호출 로직 구현 필요
-        # 입력: STT 결과, 문서 텍스트, 문서 종류(key_topic), 이전 요약
-        # 출력: 분석/요약 텍스트
+        # --- 9. Gemini 분석 ---
+        # (기존 코드와 동일 - 통합된 문서 텍스트 사용)
         gemini_analysis = "[Gemini 분석 실패]"
-        print(f"⏳ [AdminRoute] Gemini 분석 시작...")
-        # Gemini 모델에 전달할 문서 텍스트는 하나의 문자열로 결합하는 것이 일반적입니다.
-        combined_document_text = "\n\n".join(all_document_text_parts)
+        print(f"⏳ [AdminUpload] Gemini 분석 시작...")
+        combined_document_text = "\n\n".join(all_document_text_parts) # 모든 문서 텍스트 결합
         try:
             gemini_analysis = summarize_with_context(transcribed_text, combined_document_text, key_topic, previous_summary_text)
-            print(f"✅ [AdminRoute] Gemini 분석 완료")
+            print(f"✅ [AdminUpload] Gemini 분석 완료")
         except Exception as gemini_err:
-            print(f"🚨 [AdminRoute] Gemini 분석 오류: {gemini_err}")
+            print(f"🚨 [AdminUpload] Gemini 분석 오류: {gemini_err}")
             gemini_analysis = f"[Gemini 분석 오류: {gemini_err}]"
-            traceback.print_exc() # Gemini 분석 오류 시 트레이스백 출력
 
 
-        # --- 8. 최종 데이터 객체 생성 (metadata에 대상 의뢰인 정보 및 업로더 정보 포함) ---
+        # --- 10. 최종 데이터 객체 생성 ---
+        # ★ 'uploaded_files_info'에 ZIP 및 개별 파일 정보가 포함된 리스트 사용 ★
         current_timestamp_iso = datetime.now().isoformat()
         data_to_store = {
-            'original': transcribed_text, # STT 결과
-            'summary': gemini_analysis, # Gemini 분석 결과
-            # 조회 시 제거될 필드로 저장하거나, 필요한 경우에만 별도로 제공하는 방식 고려
-            # 조회 로직에서 files_content를 pop하므로 여기에 저장하는 것이 좋습니다.
-            'files_content': all_document_text_parts, # 문서 텍스트 내용을 files_content로 저장
-            'source': f'admin_upload_{key_topic}', # 데이터 출처 및 토픽 명시
-            'timestamp': current_timestamp_iso, # 처리 완료 시각
+            'original': transcribed_text,
+            'summary': gemini_analysis,
+            'files_content': combined_document_text, # OCR 결과 통합본 (텍스트만)
+            'source': f'admin_upload_{key_topic}',
+            'timestamp': current_timestamp_iso,
             'metadata': {
-                'name': target_name, 'phone': target_phone, 'region': target_region, # 대상 의뢰인 기본 정보 (정보용)
-                'email': client_email_target, # <--- 대상 의뢰인 이메일 메타데이터에 저장 (정보용)
-                # 'uid': target_client_uid, # 대상 의뢰인 UID는 이제 metadata에 반드시 저장할 필요는 없습니다 (원하면 저장).
-                'key_topic': key_topic, # 문서 종류 저장 (고소장, 보충 등)
-                'uploaded_files_info': uploaded_file_metadata_simple, # 업로드 파일 정보 (원본 파일명, 크기 등)
-                'uploader_uid': uploader_uid, # 업로드 수행자 UID 저장 (누가 업로드했는지 기록 - Primary Key와 동일)
-                'uploader_email': uploader_email, # 업로드 수행자 이메일 저장
+                'name': target_name, 'phone': target_phone, 'region': target_region,
+                'email': client_email_target,
+                'key_topic': key_topic,
+                # ★★★ 수정된 파일 정보 리스트 저장 ★★★
+                'uploaded_files_info': processed_files_full_metadata, # 여기에 ZIP 정보 또는 개별 파일 정보가 들어감
+                'uploader_uid': uploader_uid,
+                'uploader_email': uploader_email,
             },
-            'processing_status': '분석 완료' if not ocr_error_flag and transcribed_text != "[STT 결과 없음]" and gemini_analysis != "[Gemini 분석 실패]" else '분석 오류 발생', # 처리 상태 업데이트
+            'processing_status': '분석 완료' if not ocr_error_flag and transcribed_text != "[STT 결과 없음]" and not gemini_analysis.startswith("[Gemini 분석") else '분석 중 오류 발생',
+            # ZIP 생성 실패 여부도 상태에 반영 가능
         }
         print(f"ℹ️ 저장될 최종 데이터 객체 생성 완료 (상태: {data_to_store['processing_status']})")
 
 
-        # --- 9. 데이터를 업로드 수행자(관리자)의 user_memory_storage에 저장 ---
-
-        # ⚠️ 핵심: user_memory_storage의 주 키 (Primary Key)로 업로드 수행자의 UID (uploader_uid)를 사용합니다.
-        primary_key_for_storage = uploader_uid # <--- 업로드 수행자의 UID 사용!
-
-        # 해당 UID의 딕셔너리가 user_memory_storage에 없으면 생성합니다.
+        # --- 11. 데이터 저장 ---
+        # (기존 코드와 동일)
+        primary_key_for_storage = uploader_uid
         if primary_key_for_storage not in user_memory_storage:
             user_memory_storage[primary_key_for_storage] = {}
             print(f"DEBUG: Created new memory space for Primary Key (Uploader UID): {primary_key_for_storage}")
 
-        # 해당 UID 딕셔너리 안에 데이터 저장 (storage_key는 두 번째 키로 사용)
         user_memory_storage[primary_key_for_storage][storage_key] = data_to_store
-
-        # === 저장 완료 로그에 저장 정보 표시 ===
-        # 로그 메시지 수정: Primary Key가 업로더 UID임을 명시
-        print(f"✅ Data successfully saved to user_memory_storage (Primary Key Uploader UID: {primary_key_for_storage}, Secondary Key: {storage_key}, Target Email: {client_email_target or '정보없음'}, Uploader: {uploader_email})") # <--- 로그 수정
-        success_flag = True # 저장 성공 플래그 설정
+        print(f"✅ Data successfully saved to user_memory_storage (PK Uploader UID: {primary_key_for_storage}, SK: {storage_key})")
+        success_flag = True
 
 
-        # === 성공 응답 ===
-        # 프론트엔드에게 저장 성공 메시지 및 저장된 데이터의 storage_key를 반환합니다.
-        # storage_key는 나중에 이 데이터를 조회할 때 사용됩니다.
+        # --- 성공 응답 ---
+        # (기존 코드와 동일)
         return jsonify({
-            'message': f'{key_topic} 처리 및 저장 완료', # 메시지 수정
-            'storage_key': storage_key, # 프론트엔드에서 이 키로 데이터를 조회하게 됩니다.
-            'uploader_email': uploader_email, # 업로더 이메일 응답 포함 (정보용)
-            'uploader_uid': uploader_uid # 업로더 UID 응답 포함 (정보용)
-            # 대상 의뢰인 이메일/UID는 응답에 포함할지 결정
-            # 'client_email': client_email_target,
-            # 'client_uid': target_client_uid, # 대상 의뢰인 UID는 여기서 알 수 없으므로 제외
+            'message': f'{key_topic} 처리 및 저장 완료 (PDF/JPG는 ZIP으로)',
+            'storage_key': storage_key,
+            'uploader_email': uploader_email,
+            'uploader_uid': uploader_uid,
+            'client_email': client_email_target,
+            # 필요 시 ZIP 파일 정보 등 추가 반환 가능
         }), 200
 
 
     except ValueError as ve:
-        # 필수 입력 누락 등 ValueError 처리
+        # (기존 코드와 동일)
         print(f"🚨 입력/파일 처리 오류 (/admin/upload): {ve}")
-        # traceback.print_exc() # 필요시 상세 오류 추적
         return jsonify({'error': f'입력/파일 처리 오류: {str(ve)}'}), 400
     except Exception as e:
-        # 그 외 예상치 못한 서버 내부 오류 발생 시 처리
+        # (기존 코드와 동일 - 롤백 로직 포함)
         print(f"🚨 예외 발생 (/admin/upload): {e}")
-        traceback.print_exc() # 서버 콘솔에 전체 스택 트레이스 출력
-
-        # 롤백 로직: 예외 발생 시 user_memory_storage에 저장된 데이터 삭제 시도
-        # storage_key가 생성되었고 (즉, 파일 임시 저장 및 키 생성까지 진행되었고)
-        # 데이터 저장 성공 플래그(success_flag)가 설정되지 않았을 경우에만 롤백 시도
-        if storage_key and not success_flag:
-            print(f"ℹ️ 예외 발생, 저장 실패. 롤백 시도 (Storage Key: {storage_key})")
-            # 롤백 시 삭제에 필요한 primary_key는 업로더 UID (uploader_uid)입니다.
-            # uploader_uid는 try 블록 시작 시점에 이미 얻어졌으므로 바로 사용 가능합니다.
-            rollback_primary_key = uploader_uid
-
-            # user_memory_storage에서 데이터 삭제 시도 (UID와 storage_key가 모두 있어야 함)
-            if rollback_primary_key and rollback_primary_key in user_memory_storage and storage_key in user_memory_storage[rollback_primary_key]:
-                try:
-                    del user_memory_storage[rollback_primary_key][storage_key]
-                    print(f"🧹 오류 발생으로 user_memory_storage(UID: {rollback_primary_key})에서 데이터 롤백됨: {storage_key}")
-                except Exception as del_err:
-                     print(f"🚨 롤백 중 user_memory_storage 데이터 삭제 오류 발생 ({storage_key}): {del_err}")
-            elif rollback_primary_key:
-                 print(f"⚠️ 롤백할 데이터를 user_memory_storage(UID: {rollback_primary_key})에서 찾을 수 없음 (Key: {storage_key}). 이미 삭제되었거나 저장되지 않았을 수 있습니다.")
-            else:
-                 # 이 경우는 업로더 UID를 얻는 과정에서 예외가 발생했으나 여기서 catch된 경우이며, storage_key도 생성되지 않았을 가능성이 높습니다.
-                 print(f"⚠️ 롤백할 데이터를 user_memory_storage에서 찾을 수 없음 (업로더 UID 알 수 없음, Key: {storage_key}).")
-
-
-        # TODO: 만약 key_topic에 따라 user_memory_storage 외 다른 storage에도 저장하는 로직이 있었다면,
-        # 해당 storage에서도 롤백하는 로직을 여기에 추가해야 합니다.
-        # 현재 수정된 코드는 user_memory_storage에만 저장하도록 가정하고 있습니다.
-        # if storage_key and storage_target_name and not success_flag:
-        #     # ... (기존 complaint_storage 등 롤백 로직) ...
-
-
+        traceback.print_exc()
+        if storage_key and not success_flag and uploader_uid and uploader_uid in user_memory_storage and storage_key in user_memory_storage[uploader_uid]:
+            try: del user_memory_storage[uploader_uid][storage_key]; print(f"🧹 오류 발생, 데이터 롤백됨: {storage_key}")
+            except Exception as del_err: print(f"🚨 롤백 중 삭제 오류: {del_err}")
         return jsonify({'error': '서버 내부 오류 발생', 'exception': str(e)}), 500
+
     finally:
-        # 임시 파일 최종 정리
-        # 오류 발생 여부와 관계없이 함수 종료 시 임시 파일들을 정리합니다.
-        print("ℹ️ 임시 파일 정리 시작.")
-        if temp_audio_path and os.path.exists(temp_audio_path):
-            try: os.remove(temp_audio_path); print(f"🧹 (finally) 오디오 임시 파일 삭제: {temp_audio_path}")
-            except OSError as e_rem: print(f"🚨 (finally) 오디오 임시 파일 삭제 실패: {e_rem}")
-        for doc_path in temp_doc_paths:
-            if doc_path and os.path.exists(doc_path):
-                try:print(f"🧹 (finally) 문서 임시 파일 삭제: {doc_path}")
-                
-                except OSError as e_rem: print(f"🚨 (finally) 문서 임시 파일 삭제 실패: {e_rem}")
-        print(f"--- '/admin/upload' 요청 처리 완료 ---") # 처리 완료 로그 추가
+        # --- 임시 파일 정리 ---
+        # ★ 주석 처리된 삭제 로직 대신, 파일 유지 및 상태 확인 로그만 남김 ★
+        # ★ ZIP 처리 후 삭제된 파일은 건너뛰도록 확인 추가 ★
+        print("ℹ️ 임시 파일 상태 확인 시작 (삭제 안 함).")
+        for path in temp_files_to_clean:
+            if path in temp_files_zipped_and_removed: # ZIP 처리 후 이미 삭제된 파일이면 건너뜀
+                print(f"  -> 확인 건너뜀 (ZIP 포함 후 삭제됨): {path}")
+                continue
+            if path and os.path.exists(path):
+                try:
+                    # os.remove(path); print(f"🧹 임시 파일 삭제: {path}") # <<< 실제 삭제는 주석 처리됨
+                    print(f"  -> 임시 파일 유지 확인: {path}") # 유지 로그
+                except OSError as e_rem: # 혹시 모를 접근 오류 대비
+                    print(f"🚨 임시 파일 상태 확인 중 오류?: {e_rem} (파일: {path})")
+            elif path:
+                print(f"  -> 임시 파일 경로 확인됨 (파일 없음): {path}")
+
+        print(f"--- '/admin/upload' 요청 처리 완료 ---")
+
+
+
+@api_bp.route("/admin/documents/all", methods=['GET'])
+def list_all_admin_documents():
+    """
+    [사용자 전용] 인증된 사용자의 특정 클라이언트에 대한 중요 문서 목록을 통합하여 반환합니다.
+    관리자 권한 확인 없이, 로그인한 사용자의 문서만 조회합니다.
+    인증 필수. client_identifier 쿼리 파라미터로 클라이언트를 지정합니다.
+    """
+    id_token = None
+    requester_uid = None # 요청자 UID (로그인 사용자)
+    requester_email = '이메일 정보 없음' # 요청자 이메일
+
+    # user_memory_storage 전역 변수 사용 명시
+    global user_memory_storage
+    # auth 객체가 초기화되어 있는지 확인합니다. (Firebase 인증 모듈)
+    global auth
+    # ADMIN_EMAILS 전역 변수는 이 함수에서 직접적인 권한 확인에 사용되지 않습니다.
+    # 하지만 다른 곳에서 사용될 수 있으므로 global 선언은 유지합니다.
+    global ADMIN_EMAILS
+
+
+    if not auth:
+        print("🚨 /api/admin/documents/all: Firebase Auth object not available.")
+        return jsonify({"error": "Server authentication system error"}), 500
+
+    print(f"--- '/api/admin/documents/all' (사용자 전용) 데이터 조회 요청 처리 시작 ---") # 로그 메시지 업데이트
+
+    try:
+        # --- ▼▼▼ ID 토큰 확인 및 요청자 UID, 이메일 얻기 (필수!) ▼▼▼ ---
+        # 사용자를 인증하고 해당 사용자의 UID와 이메일을 가져옵니다.
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            print("🚨 /api/admin/documents/all: 인증 토큰 없음.")
+            return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+
+        id_token = auth_header.split('Bearer ')[1]
+        try:
+            # 실제 Firebase Admin SDK의 auth.verify_id_token을 사용하여 토큰 검증
+            # 이 부분에서 오류 발생 시 하단의 except Exception 블록으로 이동합니다.
+            decoded_token = auth.verify_id_token(id_token)
+
+            requester_uid = decoded_token.get('uid') # 요청자 UID (데이터 필터링의 핵심)
+            requester_email = decoded_token.get('email', '이메일 정보 없음') # 요청자 이메일 추출 (로그 및 _create_summary_list에 전달)
+
+            if not requester_uid: # UID는 사용자 데이터 조회를 위해 필수
+                 print("🚨 /api/admin/documents/all: 유효 토큰이나 UID 정보 없음.")
+                 return jsonify({"error": "인증 토큰에 사용자 정보가 없습니다."}), 401
+
+            # 이메일 정보는 로깅 및 _create_summary_list 함수 내 로직에 사용될 수 있습니다.
+            if requester_email == '이메일 정보 없음':
+                 print("⚠️ /api/admin/documents/all: 유효 토큰이나 이메일 정보 없음. 로깅/필터링에 제한될 수 있습니다.")
+                 # UID가 있으므로 목록 조회 진행은 가능합니다.
+
+            print(f"ℹ️ /api/admin/documents/all 요청 사용자 UID: {requester_uid}, Email: {requester_email}")
+
+            # --- 관리자 권한 확인 로직 제거 (사용자 요구사항 반영) ---
+            # 이 엔드포인트는 이제 관리자 전용이 아니므로 관리자 이메일 확인 로직을 삭제합니다.
+            # 사용자의 데이터를 조회하는 것은 인증만 되면 가능합니다.
+            # ADMIN_EMAILS는 이 함수 내에서 더 이상 접근 제어에 사용되지 않습니다.
+            # if requester_email not in ADMIN_EMAILS:
+            #      print(f"🚨 /api/admin/documents/all: 관리자 권한 없음. 요청자 이메일: {requester_email}")
+            #      return jsonify({"error": "관리자 권한이 필요합니다."}), 403 # 이 부분을 삭제했습니다.
+
+        except Exception as auth_err: # 토큰 검증 또는 디코딩된 토큰에서 정보 추출 중 오류 발생 시
+            # 이 예외는 auth.verify_id_token 실패, decoded_token에서 정보 추출 실패 등 다양한 원인으로 발생할 수 있습니다.
+            print(f"🚨 /api/admin/documents/all: 토큰 검증 오류: {auth_err}")
+            traceback.print_exc() # 서버 콘솔에 상세 오류 출력
+            return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 401 # 인증 실패 시 401 반환
+
+        # --- ▲▲▲ ID 토큰 확인 및 요청자 UID, 이메일 얻기 완료 ▲▲▲ ---
+
+
+        # --- ▼▼▼ client_identifier 쿼리 파라미터 가져오기 (필수) ▼▼▼ ---
+        client_identifier_filter = request.args.get('client_identifier')
+        print(f"ℹ️ /api/admin/documents/all 요청 client_identifier 필터: {client_identifier_filter}")
+
+        if not client_identifier_filter:
+            print("🚨 /api/admin/documents/all: client_identifier 쿼리 파라미터 누락.")
+            return jsonify({"error": "client_identifier 쿼리 파라미터가 필요합니다."}), 400
+        # --- ▲▲▲ client_identifier 쿼리 파라미터 가져오기 ▲▲▲ ---
+
+
+        # --- 인증 및 필수 파라미터 확인 후 로직 수행 (각 토픽별 데이터 필터링 및 통합) ---
+        print(f"--- '/api/admin/documents/all' 데이터 필터링 및 통합 시작 (사용자: {requester_uid}, 클라이언트: {client_identifier_filter}) ---")
+
+        # _create_summary_list 호출 전에 해당 사용자 데이터가 있는지 먼저 확인하여 불필요한 탐색을 막습니다.
+        user_specific_storage_data = user_memory_storage.get(requester_uid, {})
+        if not user_specific_storage_data:
+             print(f"ℹ️ 사용자 '{requester_uid}'에 대한 데이터가 user_memory_storage에 없습니다. 빈 목록 반환.")
+             return jsonify([]) # 해당 사용자의 데이터가 없으면 빈 목록 반환
+
+
+        # 통합하여 가져올 문서 토픽 목록 (기존과 동일)
+        desired_topics = ["고소장", "보충이유서", "검찰의견서", "합의서"]
+        combined_results = []
+
+        # 각 토픽별로 _create_summary_list 호출하고 결과 통합
+        # _create_summary_list 함수에 user_memory_storage 전체와 요청자의 UID를 target_uid로 전달
+        # _create_summary_list는 내부적으로 target_uid를 보고 해당 사용자의 데이터 내에서만 검색해야 합니다.
+        for topic in desired_topics:
+            try:
+                # _create_summary_list 호출 시 target_uid를 로그인한 사용자의 UID로 지정합니다.
+                # 이 호출이 성공적으로 동작하려면 _create_summary_list 함수가 target_uid 인자를 받고
+                # 해당 사용자의 데이터 (예: storage_to_search.get(target_uid, {})) 내에서만 검색하도록 수정되어 있어야 합니다.
+                topic_data = _create_summary_list(
+                    user_memory_storage, # 전체 스토리지 전달 (target_uid 필터링은 _create_summary_list 내부에서)
+                    requester_email,     # 요청자 이메일 전달 (로깅 및 _create_summary_list 내부 사용)
+                    required_topic=topic,
+                    client_identifier=client_identifier_filter,
+                    target_uid=requester_uid # <-- 로그인한 사용자의 UID를 target_uid로 전달
+                )
+                print(f"  - {topic} 항목 {len(topic_data)}개 (클라이언트: {client_identifier_filter}) 조회 완료 (사용자: {requester_uid}).")
+                combined_results.extend(topic_data) # 결과 리스트에 추가
+            except Exception as topic_filter_err:
+                print(f"⚠️ {topic} 목록 (클라이언트: {client_identifier_filter}) 필터링 중 오류 발생: {topic_filter_err}. 해당 토픽 결과는 제외될 수 있습니다 (사용자: {requester_uid}).")
+                traceback.print_exc() # 필터링 중 오류 발생 시 상세 정보 출력
+
+
+        # 필요한 경우, combined_results를 특정 기준으로 정렬 (날짜 최신순)
+        # _create_summary_list에서 이미 정렬되지만, 여러 토픽의 결과가 합쳐졌으므로 전체 정렬이 필요합니다.
+        try:
+            def get_sort_key(item):
+                 timestamp_val = item.get('date_created') or item.get('timestamp')
+                 if isinstance(timestamp_val, str):
+                     try:
+                         # ISO 8601 형식 문자열 파싱 (UTC 고려)
+                         return datetime.fromisoformat(timestamp_val.replace('Z', '+00:00'))
+                     except ValueError:
+                         # 파싱 실패 시 최소 시간 반환하여 정렬 순서에 영향 최소화
+                         return datetime.min.replace(tzinfo=timezone.utc)
+                 # 유효한 시간 정보가 없는 항목은 맨 뒤로
+                 return datetime.min.replace(tzinfo=timezone.utc)
+
+            combined_results.sort(key=get_sort_key, reverse=True)
+            print(f"--- '/api/admin/documents/all' 결과 목록 날짜 기준으로 최종 정렬 완료 (총 {len(combined_results)}개). ---")
+
+        except Exception as sort_err:
+            print(f"⚠️ '/api/admin/documents/all' 결과 목록 정렬 중 오류 발생: {sort_err}")
+            traceback.print_exc()
+            # 정렬 오류 발생 시, 정렬되지 않은 상태로 결과 반환
+
+
+        print(f"--- '/api/admin/documents/all' 처리 완료 (사용자: {requester_uid}, 클라이언트: {client_identifier_filter}), 총 {len(combined_results)}개 항목 반환 ---")
+        return jsonify(combined_results)
+
+    except Exception as e: # 예상치 못한 서버 내부 오류 (인증 오류 제외)
+        print(f"🚨 '/api/admin/documents/all' 통합 문서 목록 생성 중 예상치 못한 서버 오류 (사용자: {requester_uid}, 클라이언트: {client_identifier_filter}): {e}")
+        traceback.print_exc() # 서버 콘솔에 전체 스택 트레이스 출력
+        return jsonify({"error":"통합 문서 목록 생성 중 서버 오류", "detail": str(e)}), 500
 
 # --- 목록 조회 라우트 ---
-@api_bp.route("/complaints")
-def list_complaints():
-    """고소장 목록 반환 (인증 및 소유권/관리자/토픽 필터링)""" # 설명 수정
-    id_token = None
-    uploader_uid = None # 요청자 UID (로깅용)
-    requester_email = '이메일 정보 없음' # 요청자 이메일
+# @api_bp.route("/complaints")
+# def list_complaints():
+#     """고소장 목록 반환 (인증 및 소유권/관리자/토픽 필터링)""" # 설명 수정
+#     id_token = None
+#     uploader_uid = None # 요청자 UID (로깅용)
+#     requester_email = '이메일 정보 없음' # 요청자 이메일
 
-    # user_memory_storage 전역 변수 사용 명시 ▼▼▼
-    global user_memory_storage
+#     # user_memory_storage 전역 변수 사용 명시 ▼▼▼
+#     global user_memory_storage
 
-    # auth 객체가 초기화되어 있는지 확인합니다. (실제 auth 또는 Mock)
-    if not auth:
-        print("🚨 /api/complaints: Firebase Auth object not available.")
-        return jsonify({"error": "Server authentication system error"}), 500
+#     # auth 객체가 초기화되어 있는지 확인합니다. (실제 auth 또는 Mock)
+#     if not auth:
+#         print("🚨 /api/complaints: Firebase Auth object not available.")
+#         return jsonify({"error": "Server authentication system error"}), 500
 
-    try:
-        # --- ▼▼▼ ID 토큰 확인 및 요청자 UID, 이메일 얻기 (필수!) ▼▼▼ ---
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            print("🚨 /api/complaints: 인증 토큰 없음.")
-            # 목록 조회를 위해 인증 필수
-            return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+#     try:
+#         # --- ▼▼▼ ID 토큰 확인 및 요청자 UID, 이메일 얻기 (필수!) ▼▼▼ ---
+#         auth_header = request.headers.get('Authorization')
+#         if not auth_header or not auth_header.startswith('Bearer '):
+#             print("🚨 /api/complaints: 인증 토큰 없음.")
+#             # 목록 조회를 위해 인증 필수
+#             return jsonify({"error": "인증 토큰이 필요합니다."}), 401
 
-        id_token = auth_header.split('Bearer ')[1]
-        try:
-            decoded_token = auth.verify_id_token(id_token) # 토큰 검증
-            uploader_uid = decoded_token.get('uid') # 요청자 UID (get 사용)
-            requester_email = decoded_token.get('email', '이메일 정보 없음') # 요청자 이메일 추출
+#         id_token = auth_header.split('Bearer ')[1]
+#         try:
+#             decoded_token = auth.verify_id_token(id_token) # 토큰 검증
+#             uploader_uid = decoded_token.get('uid') # 요청자 UID (get 사용)
+#             requester_email = decoded_token.get('email', '이메일 정보 없음') # 요청자 이메일 추출
 
-            if requester_email == '이메일 정보 없음':
-                 print("🚨 /api/complaints: 유효 토큰이나 이메일 정보 없음. 목록 필터링 불가.")
-                 # 필터링을 위해 이메일 필수
-                 return jsonify({"error": "인증 토큰에 이메일 정보가 없습니다. 목록 필터링 불가."}), 401 # 또는 403
+#             if requester_email == '이메일 정보 없음':
+#                  print("🚨 /api/complaints: 유효 토큰이나 이메일 정보 없음. 목록 필터링 불가.")
+#                  # 필터링을 위해 이메일 필수
+#                  return jsonify({"error": "인증 토큰에 이메일 정보가 없습니다. 목록 필터링 불가."}), 401 # 또는 403
 
-            print(f"ℹ️ /api/complaints 요청 사용자 UID: {uploader_uid}, Email: {requester_email}")
-            # 관리자 체크는 _create_summary_list 내부에서 이메일로 수행됩니다.
+#             print(f"ℹ️ /api/complaints 요청 사용자 UID: {uploader_uid}, Email: {requester_email}")
+#             # 관리자 체크는 _create_summary_list 내부에서 이메일로 수행됩니다.
 
-        except Exception as auth_err: # 토큰 검증/정보 추출 오류
-            print(f"🚨 /api/complaints: 토큰 검증 오류: {auth_err}")
-            traceback.print_exc()
-            is_invalid_token_error = isinstance(auth_err, auth.InvalidIdTokenError) if hasattr(auth, 'InvalidIdTokenError') else ("Invalid Token" in str(auth_err))
-            error_status_code = 401 if is_invalid_token_error else 500
-            return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 500
-        # --- ▲▲▲ ID 토큰 확인 및 요청자 UID, 이메일 얻기 ▲▲▲ ---
+#         except Exception as auth_err: # 토큰 검증/정보 추출 오류
+#             print(f"🚨 /api/complaints: 토큰 검증 오류: {auth_err}")
+#             traceback.print_exc()
+#             is_invalid_token_error = isinstance(auth_err, auth.InvalidIdTokenError) if hasattr(auth, 'InvalidIdTokenError') else ("Invalid Token" in str(auth_err))
+#             error_status_code = 401 if is_invalid_token_error else 500
+#             return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 500
+#         # --- ▲▲▲ ID 토큰 확인 및 요청자 UID, 이메일 얻기 ▲▲▲ ---
 
-        # --- 인증 통과 후 로직 수행 (데이터 필터링) ---
-        print(f"--- '/api/complaints' 데이터 조회 시작 (요청자: {requester_email}) ---")
-        # user_memory_storage 전체에서 고소장 목록을 가져오되, 요청자의 이메일과 토픽("고소장")으로 필터링 ▼▼▼
-        # _create_summary_list 함수는 다른 곳에 정의되어 있으며, user_memory_storage 구조를 탐색하고 필터링합니다.
-        data = _create_summary_list(user_memory_storage, requester_email, required_topic="고소장") # <--- 조회 대상을 user_memory_storage로 변경
+#         # --- 인증 통과 후 로직 수행 (데이터 필터링) ---
+#         print(f"--- '/api/complaints' 데이터 조회 시작 (요청자: {requester_email}) ---")
+#         # user_memory_storage 전체에서 고소장 목록을 가져오되, 요청자의 이메일과 토픽("고소장")으로 필터링 ▼▼▼
+#         # _create_summary_list 함수는 다른 곳에 정의되어 있으며, user_memory_storage 구조를 탐색하고 필터링합니다.
+#         data = _create_summary_list(user_memory_storage, requester_email, required_topic="고소장") # <--- 조회 대상을 user_memory_storage로 변경
 
-        print(f"--- '/api/complaints' 처리 완료, {len(data)}개 항목 반환 ---")
-        return jsonify(data)
+#         print(f"--- '/api/complaints' 처리 완료, {len(data)}개 항목 반환 ---")
+#         return jsonify(data)
 
-    except Exception as e:
-        print(f"🚨 고소장 목록 생성 오류 (요청자: {requester_email}): {e}") # 로그에 요청자 이메일 포함
-        traceback.print_exc()
-        return jsonify({"error":"고소장 목록 생성 실패", "detail": str(e)}), 500
+#     except Exception as e:
+#         print(f"🚨 고소장 목록 생성 오류 (요청자: {requester_email}): {e}") # 로그에 요청자 이메일 포함
+#         traceback.print_exc()
+#         return jsonify({"error":"고소장 목록 생성 실패", "detail": str(e)}), 500
 
-@api_bp.route("/supplementaries")
-def list_supplementaries():
-    """보충이유서 목록 반환 (인증 및 소유권/관리자/토픽 필터링)""" # 설명 수정
-    id_token = None
-    uploader_uid = None
+# @api_bp.route("/supplementaries")
+# def list_supplementaries():
+#     """보충이유서 목록 반환 (인증 및 소유권/관리자/토픽 필터링)""" # 설명 수정
+#     id_token = None
+#     uploader_uid = None
+#     requester_email = '이메일 정보 없음'
+
+#     # user_memory_storage 전역 변수 사용 명시 ▼▼▼
+#     global user_memory_storage
+
+#     if not auth:
+#         print("🚨 /api/supplementaries: Firebase Auth object not available.")
+#         return jsonify({"error": "Server authentication system error"}), 500
+
+#     try:
+#         auth_header = request.headers.get('Authorization')
+#         if not auth_header or not auth_header.startswith('Bearer '):
+#             print("🚨 /api/supplementaries: 인증 토큰 없음.")
+#             return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+
+#         id_token = auth_header.split('Bearer ')[1]
+#         try:
+#             decoded_token = auth.verify_id_token(id_token)
+#             uploader_uid = decoded_token.get('uid')
+#             requester_email = decoded_token.get('email', '이메일 정보 없음')
+
+#             if requester_email == '이메일 정보 없음':
+#                  print("🚨 /api/supplementaries: 유효 토큰이나 이메일 정보 없음. 목록 필터링 불가.")
+#                  return jsonify({"error": "인증 토큰에 이메일 정보가 없습니다. 목록 필터링 불가."}), 401
+
+#             print(f"ℹ️ /api/supplementaries 요청 사용자 UID: {uploader_uid}, Email: {requester_email}")
+
+#         except Exception as auth_err:
+#             print(f"🚨 /api/supplementaries: 토큰 검증 오류: {auth_err}")
+#             traceback.print_exc()
+#             is_invalid_token_error = isinstance(auth_err, auth.InvalidIdTokenError) if hasattr(auth, 'InvalidIdTokenError') else ("Invalid Token" in str(auth_err))
+#             error_status_code = 401 if is_invalid_token_error else 500
+#             return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 500
+
+#         print(f"--- '/api/supplementaries' 데이터 조회 시작 (요청자: {requester_email}) ---")
+#         # user_memory_storage 전체에서 보충이유서 목록을 가져오되, 요청자의 이메일과 토픽("보충이유서")으로 필터링 ▼▼▼
+#         data = _create_summary_list(user_memory_storage, requester_email, required_topic="보충이유서") # <--- 조회 대상을 user_memory_storage로 변경
+
+#         print(f"--- '/api/supplementaries' 처리 완료, {len(data)}개 항목 반환 ---")
+#         return jsonify(data)
+
+#     except Exception as e:
+#         print(f"🚨 보충이유서 목록 생성 오류 (요청자: {requester_email}): {e}") # 로그에 요청자 이메일 포함
+#         traceback.print_exc()
+#         return jsonify({"error":"보충이유서 목록 생성 실패", "detail": str(e)}), 500
+
+
+# @api_bp.route("/prosecutor")
+# def list_prosecutor_opinions():
+#     """검찰의견서 목록 반환 (인증 및 소유권/관리자/토픽 필터링)""" # 설명 수정
+#     id_token = None
+#     uploader_uid = None
+#     requester_email = '이메일 정보 없음'
+
+#     # user_memory_storage 전역 변수 사용 명시 ▼▼▼
+#     global user_memory_storage
+
+#     if not auth:
+#         print("🚨 /api/prosecutor: Firebase Auth object not available.")
+#         return jsonify({"error": "Server authentication system error"}), 500
+
+#     try:
+#         auth_header = request.headers.get('Authorization')
+#         if not auth_header or not auth_header.startswith('Bearer '):
+#             print("🚨 /api/prosecutor: 인증 토큰 없음.")
+#             return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+
+#         id_token = auth_header.split('Bearer ')[1]
+#         try:
+#             decoded_token = auth.verify_id_token(id_token)
+#             uploader_uid = decoded_token.get('uid')
+#             requester_email = decoded_token.get('email', '이메일 정보 없음')
+
+#             if requester_email == '이메일 정보 없음':
+#                  print("🚨 /api/prosecutor: 유효 토큰이나 이메일 정보 없음. 목록 필터링 불가.")
+#                  return jsonify({"error": "인증 토큰에 이메일 정보가 없습니다. 목록 필터링 불가."}), 401
+
+#             print(f"ℹ️ /api/prosecutor 요청 사용자 UID: {uploader_uid}, Email: {requester_email}")
+
+#         except Exception as auth_err:
+#             print(f"🚨 /api/prosecutor: 토큰 검증 오류: {auth_err}")
+#             traceback.print_exc()
+#             is_invalid_token_error = isinstance(auth_err, auth.InvalidIdTokenError) if hasattr(auth, 'InvalidIdTokenError') else ("Invalid Token" in str(auth_err))
+#             error_status_code = 401 if is_invalid_token_error else 500
+#             return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 500
+
+#         print(f"--- '/api/prosecutor' 데이터 조회 시작 (요청자: {requester_email}) ---")
+#         # user_memory_storage 전체에서 검찰의견서 목록을 가져오되, 요청자의 이메일과 토픽("검찰의견서")으로 필터링 ▼▼▼
+#         data = _create_summary_list(user_memory_storage, requester_email, required_topic="검찰의견서") # <--- 조회 대상을 user_memory_storage로 변경
+
+#         print(f"--- '/api/prosecutor' 처리 완료, {len(data)}개 항목 반환 ---")
+#         return jsonify(data)
+
+#     except Exception as e:
+#         print(f"🚨 검찰의견서 목록 생성 오류 (요청자: {requester_email}): {e}")
+#         traceback.print_exc()
+#         return jsonify({"error":"검찰의견서 목록 생성 실패", "detail": str(e)}), 500
+
+# @api_bp.route("/agreements")
+# def list_agreements(): # 함수 이름을 list_agreements 로 변경
+#     """합의서 목록 반환 (인증 및 소유권/관리자/토픽 필터링)""" # 설명 수정
+#     id_token = None
+#     uploader_uid = None # 요청자 UID (로깅용)
+#     requester_email = '이메일 정보 없음' # 요청자 이메일
+
+#     # user_memory_storage 전역 변수 사용 명시 ▼▼▼
+#     global user_memory_storage
+
+#     # auth 객체가 초기화되어 있는지 확인합니다. (실제 auth 또는 Mock)
+#     if not auth:
+#         print("🚨 /api/agreements: Firebase Auth object not available.") # 로그 메시지 수정
+#         return jsonify({"error": "Server authentication system error"}), 500
+
+#     try:
+#         # --- ▼▼▼ ID 토큰 확인 및 요청자 UID, 이메일 얻기 (필수!) ▼▼▼ ---
+#         auth_header = request.headers.get('Authorization')
+#         if not auth_header or not auth_header.startswith('Bearer '):
+#             print("🚨 /api/agreements: 인증 토큰 없음.") # 로그 메시지 수정
+#             # 목록 조회를 위해 인증 필수
+#             return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+
+#         id_token = auth_header.split('Bearer ')[1]
+#         try:
+#             decoded_token = auth.verify_id_token(id_token) # 토큰 검증
+#             uploader_uid = decoded_token.get('uid') # 요청자 UID (get 사용)
+#             requester_email = decoded_token.get('email', '이메일 정보 없음') # 요청자 이메일 추출
+
+#             if requester_email == '이메일 정보 없음':
+#                 print("🚨 /api/agreements: 유효 토큰이나 이메일 정보 없음. 목록 필터링 불가.") # 로그 메시지 수정
+#                 # 필터링을 위해 이메일 필수
+#                 return jsonify({"error": "인증 토큰에 이메일 정보가 없습니다. 목록 필터링 불가."}), 401 # 또는 403
+
+#             print(f"ℹ️ /api/agreements 요청 사용자 UID: {uploader_uid}, Email: {requester_email}") # 로그 메시지 수정
+#             # 관리자 체크는 _create_summary_list 내부에서 이메일로 수행됩니다.
+
+#         except Exception as auth_err: # 토큰 검증/정보 추출 오류
+#             print(f"🚨 /api/agreements: 토큰 검증 오류: {auth_err}") # 로그 메시지 수정
+#             traceback.print_exc()
+#             is_invalid_token_error = isinstance(auth_err, auth.InvalidIdTokenError) if hasattr(auth, 'InvalidIdTokenError') else ("Invalid Token" in str(auth_err))
+#             error_status_code = 401 if is_invalid_token_error else 500
+#             return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 500
+#         # --- ▲▲▲ ID 토큰 확인 및 요청자 UID, 이메일 얻기 ▲▲▲ ---
+
+#         # --- 인증 통과 후 로직 수행 (데이터 필터링) ---
+#         print(f"--- '/api/agreements' 데이터 조회 시작 (요청자: {requester_email}) ---") # 로그 메시지 수정
+#         # user_memory_storage 전체에서 합의서 목록을 가져오되, 요청자의 이메일과 토픽("합의서")으로 필터링 ▼▼▼
+#         # _create_summary_list 함수는 다른 곳에 정의되어 있으며, user_memory_storage 구조를 탐색하고 필터링합니다.
+#         data = _create_summary_list(user_memory_storage, requester_email, required_topic="합의서") # <--- 조회 대상을 user_memory_storage로 변경하고 토픽을 "합의서"로 변경
+
+#         print(f"--- '/api/agreements' 처리 완료, {len(data)}개 항목 반환 ---") # 로그 메시지 수정
+#         return jsonify(data)
+
+#     except Exception as e:
+#         print(f"🚨 합의서 목록 생성 오류 (요청자: {requester_email}): {e}") # 로그 메시지 및 에러 메시지 수정
+#         traceback.print_exc()
+#         return jsonify({"error":"합의서 목록 생성 실패", "detail": str(e)}), 500 # 에러 메시지 수정
+
+@api_bp.route("/clients", methods=['GET'])
+def list_my_clients():
+    """
+    인증된 사용자의 클라이언트 목록을 반환합니다.
+    각 클라이언트별 첫 상담일, 마지막 활동일, 문서 목록 정보를 포함합니다.
+    """
+    requester_uid = None
     requester_email = '이메일 정보 없음'
 
-    # user_memory_storage 전역 변수 사용 명시 ▼▼▼
-    global user_memory_storage
-
+    global user_memory_storage, auth
     if not auth:
-        print("🚨 /api/supplementaries: Firebase Auth object not available.")
+        print("🚨 /api/clients: Firebase Auth object not available.")
         return jsonify({"error": "Server authentication system error"}), 500
 
+    print(f"--- '/api/clients' 클라이언트 목록 조회 요청 처리 시작 ---")
+
     try:
+        # --- 인증 로직 (기존과 동일) ---
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith('Bearer '):
-            print("🚨 /api/supplementaries: 인증 토큰 없음.")
             return jsonify({"error": "인증 토큰이 필요합니다."}), 401
-
         id_token = auth_header.split('Bearer ')[1]
         try:
             decoded_token = auth.verify_id_token(id_token)
-            uploader_uid = decoded_token.get('uid')
+            requester_uid = decoded_token.get('uid')
             requester_email = decoded_token.get('email', '이메일 정보 없음')
-
-            if requester_email == '이메일 정보 없음':
-                 print("🚨 /api/supplementaries: 유효 토큰이나 이메일 정보 없음. 목록 필터링 불가.")
-                 return jsonify({"error": "인증 토큰에 이메일 정보가 없습니다. 목록 필터링 불가."}), 401
-
-            print(f"ℹ️ /api/supplementaries 요청 사용자 UID: {uploader_uid}, Email: {requester_email}")
-
+            if not requester_uid:
+                return jsonify({"error": "인증 토큰에 사용자 정보가 없습니다."}), 401
+            print(f"ℹ️ /api/clients 요청 사용자 UID: {requester_uid}, Email: {requester_email}")
         except Exception as auth_err:
-            print(f"🚨 /api/supplementaries: 토큰 검증 오류: {auth_err}")
-            traceback.print_exc()
-            is_invalid_token_error = isinstance(auth_err, auth.InvalidIdTokenError) if hasattr(auth, 'InvalidIdTokenError') else ("Invalid Token" in str(auth_err))
-            error_status_code = 401 if is_invalid_token_error else 500
-            return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 500
+            print(f"🚨 /api/clients: 토큰 검증 오류: {auth_err}")
+            # traceback.print_exc() # 상세 오류 필요시 주석 해제
+            return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 401
+        # --- 인증 완료 ---
 
-        print(f"--- '/api/supplementaries' 데이터 조회 시작 (요청자: {requester_email}) ---")
-        # user_memory_storage 전체에서 보충이유서 목록을 가져오되, 요청자의 이메일과 토픽("보충이유서")으로 필터링 ▼▼▼
-        data = _create_summary_list(user_memory_storage, requester_email, required_topic="보충이유서") # <--- 조회 대상을 user_memory_storage로 변경
+        # --- 클라이언트별 데이터 집계 시작 ---
+        user_data = user_memory_storage.get(requester_uid, {})
+        if not user_data:
+            print(f"ℹ️ /api/clients: 사용자 '{requester_uid}' 데이터 없음. 빈 목록 반환.")
+            return jsonify([])
 
-        print(f"--- '/api/supplementaries' 처리 완료, {len(data)}개 항목 반환 ---")
-        return jsonify(data)
+        # 클라이언트 식별자(key)를 기준으로 데이터를 집계할 딕셔너리
+        clients_aggregated_data = {}
 
-    except Exception as e:
-        print(f"🚨 보충이유서 목록 생성 오류 (요청자: {requester_email}): {e}") # 로그에 요청자 이메일 포함
-        traceback.print_exc()
-        return jsonify({"error":"보충이유서 목록 생성 실패", "detail": str(e)}), 500
+        # 타임스탬프 파싱 및 비교를 위한 헬퍼 함수
+        def parse_timestamp(ts_str):
+            if not ts_str or not isinstance(ts_str, str):
+                return None
+            try:
+                # ISO 8601 형식 처리 (시간대 정보 포함/미포함 모두 고려)
+                # 'Z'를 +00:00으로 변경하여 UTC로 명시적 처리
+                dt = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                # 시간대 정보가 없다면 UTC로 가정 (일관성을 위해)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
+            except ValueError:
+                print(f"WARN: Invalid timestamp format encountered: {ts_str}")
+                return None
+
+        # 사용자의 모든 데이터 항목 순회
+        for storage_key, data_item in user_data.items():
+            if not isinstance(data_item, dict): continue # 유효하지 않은 항목 스킵
+
+            metadata = data_item.get('metadata', {})
+            client_name = metadata.get('name', '')
+            client_phone = metadata.get('phone', '')
+            # 이메일은 client_email_target 또는 email 또는 user_email 에서 가져오도록 수정
+            client_email = metadata.get('client_email_target', metadata.get('email', metadata.get('user_email', '')))
+
+            # 클라이언트 식별자 생성 (이름 또는 전화번호 필수)
+            if not client_name and not client_phone: continue
+            client_identifier = f"{client_name}|{client_phone}|{client_email}" # 고유 식별자
+
+            # 현재 항목의 타임스탬프 파싱
+            current_timestamp_str = data_item.get('timestamp')
+            current_dt = parse_timestamp(current_timestamp_str)
+
+            # 집계 딕셔너리에 클라이언트 정보 추가 또는 업데이트
+            if client_identifier not in clients_aggregated_data:
+                # 새 클라이언트 발견 시 초기화
+                clients_aggregated_data[client_identifier] = {
+                    'identifier': client_identifier,
+                    'name': client_name if client_name else '이름 정보 없음',
+                    'phone': client_phone if client_phone else '전화번호 정보 없음',
+                    'region': metadata.get('region', '지역 정보 없음'),
+                    'email': client_email if client_email else '이메일 정보 없음',
+                    'earliest_timestamp': current_dt, # 첫 발견 시점의 타임스탬프로 초기화
+                    'latest_timestamp': current_dt,   # 첫 발견 시점의 타임스탬프로 초기화
+                    'documents': [] # 문서 목록 초기화
+                }
+            else:
+                # 기존 클라이언트 - 타임스탬프 업데이트
+                agg_data = clients_aggregated_data[client_identifier]
+                if current_dt:
+                    if agg_data['earliest_timestamp'] is None or current_dt < agg_data['earliest_timestamp']:
+                        agg_data['earliest_timestamp'] = current_dt
+                    if agg_data['latest_timestamp'] is None or current_dt > agg_data['latest_timestamp']:
+                        agg_data['latest_timestamp'] = current_dt
+
+            # 문서 정보 수집 (key_topic이 있는 항목을 문서로 간주)
+            key_topic = metadata.get('key_topic')
+            if key_topic: # 토픽이 있어야 문서로 간주
+                 clients_aggregated_data[client_identifier]['documents'].append({
+                     'topic': key_topic,
+                     'name': metadata.get('document_name', key_topic), # 문서 제목 (없으면 토픽 사용)
+                     'date': current_timestamp_str.split('T')[0] if current_timestamp_str else None, # 날짜 부분 (YYYY-MM-DD)
+                     'timestamp': current_timestamp_str, # 전체 타임스탬프 (정렬 및 상세 정보용)
+                     'storage_key': storage_key # 상세 보기용 키
+                 })
+
+        # --- 최종 결과 리스트 생성 ---
+        clients_list = []
+        # 파이썬에서 사용 가능한 가장 오래된 시간 (시간대 정보 포함)
+        min_datetime_aware = datetime.min.replace(tzinfo=timezone.utc)
+
+        for client_data in clients_aggregated_data.values():
+            # 타임스탬프를 ISO 문자열로 변환 (JSON 호환)
+            earliest_ts_str = client_data['earliest_timestamp'].isoformat() if client_data['earliest_timestamp'] else None
+            latest_ts_str = client_data['latest_timestamp'].isoformat() if client_data['latest_timestamp'] else None
+
+            # documents 리스트도 최신순으로 정렬 (선택 사항)
+            try:
+                client_data['documents'].sort(
+                    key=lambda doc: parse_timestamp(doc.get('timestamp')) or min_datetime_aware,
+                    reverse=True
+                )
+            except Exception as doc_sort_err:
+                 print(f"WARN: Failed to sort documents for client {client_data['identifier']}: {doc_sort_err}")
 
 
-@api_bp.route("/prosecutor")
-def list_prosecutor_opinions():
-    """검찰의견서 목록 반환 (인증 및 소유권/관리자/토픽 필터링)""" # 설명 수정
-    id_token = None
-    uploader_uid = None
-    requester_email = '이메일 정보 없음'
+            clients_list.append({
+                'identifier': client_data['identifier'],
+                'name': client_data['name'],
+                'phone': client_data['phone'],
+                'region': client_data['region'],
+                'email': client_data['email'],
+                'earliest_timestamp': earliest_ts_str, # 첫 상담일
+                'latest_timestamp': latest_ts_str,   # 마지막 활동일 (정렬 및 표시에 사용 가능)
+                'documents': client_data['documents'] # 문서 목록 배열
+                # 'status': '수임' # 상태는 여기서 고정해도 되고, 프론트에서 해도 됨
+            })
 
-    # user_memory_storage 전역 변수 사용 명시 ▼▼▼
-    global user_memory_storage
-
-    if not auth:
-        print("🚨 /api/prosecutor: Firebase Auth object not available.")
-        return jsonify({"error": "Server authentication system error"}), 500
-
-    try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            print("🚨 /api/prosecutor: 인증 토큰 없음.")
-            return jsonify({"error": "인증 토큰이 필요합니다."}), 401
-
-        id_token = auth_header.split('Bearer ')[1]
+        # 최종 클라이언트 목록을 마지막 활동일 기준 내림차순 정렬
         try:
-            decoded_token = auth.verify_id_token(id_token)
-            uploader_uid = decoded_token.get('uid')
-            requester_email = decoded_token.get('email', '이메일 정보 없음')
+             clients_list.sort(
+                 key=lambda x: parse_timestamp(x.get('latest_timestamp')) or min_datetime_aware,
+                 reverse=True
+             )
+             print(f"--- '/api/clients' 최종 목록 정렬 완료 ---")
+        except Exception as final_sort_err:
+             print(f"WARN: Failed to sort final client list: {final_sort_err}")
 
-            if requester_email == '이메일 정보 없음':
-                 print("🚨 /api/prosecutor: 유효 토큰이나 이메일 정보 없음. 목록 필터링 불가.")
-                 return jsonify({"error": "인증 토큰에 이메일 정보가 없습니다. 목록 필터링 불가."}), 401
 
-            print(f"ℹ️ /api/prosecutor 요청 사용자 UID: {uploader_uid}, Email: {requester_email}")
-
-        except Exception as auth_err:
-            print(f"🚨 /api/prosecutor: 토큰 검증 오류: {auth_err}")
-            traceback.print_exc()
-            is_invalid_token_error = isinstance(auth_err, auth.InvalidIdTokenError) if hasattr(auth, 'InvalidIdTokenError') else ("Invalid Token" in str(auth_err))
-            error_status_code = 401 if is_invalid_token_error else 500
-            return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 500
-
-        print(f"--- '/api/prosecutor' 데이터 조회 시작 (요청자: {requester_email}) ---")
-        # user_memory_storage 전체에서 검찰의견서 목록을 가져오되, 요청자의 이메일과 토픽("검찰의견서")으로 필터링 ▼▼▼
-        data = _create_summary_list(user_memory_storage, requester_email, required_topic="검찰의견서") # <--- 조회 대상을 user_memory_storage로 변경
-
-        print(f"--- '/api/prosecutor' 처리 완료, {len(data)}개 항목 반환 ---")
-        return jsonify(data)
+        print(f"--- '/api/clients' 처리 완료, 총 {len(clients_list)}개 클라이언트 반환 ---")
+        return jsonify(clients_list)
 
     except Exception as e:
-        print(f"🚨 검찰의견서 목록 생성 오류 (요청자: {requester_email}): {e}")
+        print(f"🚨 사용자 클라이언트 목록 생성 오류 (요청자 UID: {requester_uid}): {e}")
         traceback.print_exc()
-        return jsonify({"error":"검찰의견서 목록 생성 실패", "detail": str(e)}), 500
-
-@api_bp.route("/agreements")
-def list_agreements(): # 함수 이름을 list_agreements 로 변경
-    """합의서 목록 반환 (인증 및 소유권/관리자/토픽 필터링)""" # 설명 수정
-    id_token = None
-    uploader_uid = None # 요청자 UID (로깅용)
-    requester_email = '이메일 정보 없음' # 요청자 이메일
-
-    # user_memory_storage 전역 변수 사용 명시 ▼▼▼
-    global user_memory_storage
-
-    # auth 객체가 초기화되어 있는지 확인합니다. (실제 auth 또는 Mock)
-    if not auth:
-        print("🚨 /api/agreements: Firebase Auth object not available.") # 로그 메시지 수정
-        return jsonify({"error": "Server authentication system error"}), 500
-
-    try:
-        # --- ▼▼▼ ID 토큰 확인 및 요청자 UID, 이메일 얻기 (필수!) ▼▼▼ ---
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            print("🚨 /api/agreements: 인증 토큰 없음.") # 로그 메시지 수정
-            # 목록 조회를 위해 인증 필수
-            return jsonify({"error": "인증 토큰이 필요합니다."}), 401
-
-        id_token = auth_header.split('Bearer ')[1]
-        try:
-            decoded_token = auth.verify_id_token(id_token) # 토큰 검증
-            uploader_uid = decoded_token.get('uid') # 요청자 UID (get 사용)
-            requester_email = decoded_token.get('email', '이메일 정보 없음') # 요청자 이메일 추출
-
-            if requester_email == '이메일 정보 없음':
-                print("🚨 /api/agreements: 유효 토큰이나 이메일 정보 없음. 목록 필터링 불가.") # 로그 메시지 수정
-                # 필터링을 위해 이메일 필수
-                return jsonify({"error": "인증 토큰에 이메일 정보가 없습니다. 목록 필터링 불가."}), 401 # 또는 403
-
-            print(f"ℹ️ /api/agreements 요청 사용자 UID: {uploader_uid}, Email: {requester_email}") # 로그 메시지 수정
-            # 관리자 체크는 _create_summary_list 내부에서 이메일로 수행됩니다.
-
-        except Exception as auth_err: # 토큰 검증/정보 추출 오류
-            print(f"🚨 /api/agreements: 토큰 검증 오류: {auth_err}") # 로그 메시지 수정
-            traceback.print_exc()
-            is_invalid_token_error = isinstance(auth_err, auth.InvalidIdTokenError) if hasattr(auth, 'InvalidIdTokenError') else ("Invalid Token" in str(auth_err))
-            error_status_code = 401 if is_invalid_token_error else 500
-            return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 500
-        # --- ▲▲▲ ID 토큰 확인 및 요청자 UID, 이메일 얻기 ▲▲▲ ---
-
-        # --- 인증 통과 후 로직 수행 (데이터 필터링) ---
-        print(f"--- '/api/agreements' 데이터 조회 시작 (요청자: {requester_email}) ---") # 로그 메시지 수정
-        # user_memory_storage 전체에서 합의서 목록을 가져오되, 요청자의 이메일과 토픽("합의서")으로 필터링 ▼▼▼
-        # _create_summary_list 함수는 다른 곳에 정의되어 있으며, user_memory_storage 구조를 탐색하고 필터링합니다.
-        data = _create_summary_list(user_memory_storage, requester_email, required_topic="합의서") # <--- 조회 대상을 user_memory_storage로 변경하고 토픽을 "합의서"로 변경
-
-        print(f"--- '/api/agreements' 처리 완료, {len(data)}개 항목 반환 ---") # 로그 메시지 수정
-        return jsonify(data)
-
-    except Exception as e:
-        print(f"🚨 합의서 목록 생성 오류 (요청자: {requester_email}): {e}") # 로그 메시지 및 에러 메시지 수정
-        traceback.print_exc()
-        return jsonify({"error":"합의서 목록 생성 실패", "detail": str(e)}), 500 # 에러 메시지 수정
+        return jsonify({"error":"클라이언트 목록 생성 실패", "detail": str(e)}), 500
 
 @api_bp.route("/summaries")
 def list_summaries():
@@ -1332,5 +1677,312 @@ def get_calendar_events():
 # 나머지 기존 Flask 라우트 및 코드들 ...
 # if __name__ == '__main__':
 #     app.run(...)
+@api_bp.route("/admin/files/list", methods=['GET'])
+def admin_list_files_logic():
+    print(f"--- '/admin/files/list' [Workaround] 요청 처리 시작 ---")
+    # 1. 인증 (기존과 동일)
+    auth_header = request.headers.get('Authorization')
+    id_token = None
+    uploader_uid = None
+    if auth_header and auth_header.startswith('Bearer '): id_token = auth_header.split('Bearer ')[1]
+    if not id_token: return jsonify({"error": "인증 토큰 필요"}), 401
+    try:
+        decoded_token = auth.verify_id_token(id_token)
+        uploader_uid = decoded_token['uid']
+        print(f"ℹ️ /admin/files/list [Workaround] 요청자 UID: {uploader_uid}")
+    except Exception as e:
+        print(f"🚨 /admin/files/list [Workaround] 토큰 검증 오류: {e}")
+        return jsonify({"error": "토큰 검증 오류", "detail": str(e)}), 401
 
-print("--- [API Routes] Routes defined ---")
+    # 2. 검색 조건 (기존과 동일)
+    search_name = request.args.get('name', '').strip()
+    search_phone = request.args.get('phone', '').strip()
+    search_region = request.args.get('region', '').strip()
+    search_email = request.args.get('clientEmail', '').strip()
+    search_key_topic = request.args.get('key', '').strip()
+    print(f"ℹ️ 검색 조건 - 이름: '{search_name}', 전화: '{search_phone}', 지역: '{search_region}', 이메일: '{search_email}', 토픽: '{search_key_topic}'")
+    if not any([search_name, search_phone, search_region, search_email, search_key_topic]):
+         print("⚠️ 검색 조건 없음. 빈 목록 반환.")
+         return jsonify({"files": [], "message": "검색 조건 입력 필요"}), 200
+
+    # 3. 데이터 검색 및 필터링 (Workaround 수정)
+    admin_storage = user_memory_storage.get(uploader_uid, {})
+    found_files_metadata = []
+    print(f"ℹ️ '{uploader_uid}' 관리자 저장 공간 {len(admin_storage)}개 항목 검색 시작 [Workaround].")
+
+    for storage_key, data in admin_storage.items():
+        metadata = data.get('metadata', {})
+        # 검색 조건 매칭
+        match = True
+        if search_name and metadata.get('name') != search_name: match = False
+        if search_phone and metadata.get('phone') != search_phone: match = False
+        if search_region and metadata.get('region') != search_region: match = False
+        if search_email and metadata.get('email') != search_email: match = False
+        if search_key_topic and metadata.get('key_topic') != search_key_topic: match = False
+
+        if not match: continue # 조건 안 맞으면 다음 항목으로
+
+        print(f"  ✓ Entry Matched: storage_key='{storage_key}'")
+        files_info_list = metadata.get('uploaded_files_info', [])
+        print(f"    - Found {len(files_info_list)} file info entries.")
+
+        for file_info in files_info_list:
+            original_filename = file_info.get('original_filename')
+            processed_filename_stored = file_info.get('processed_filename') # 저장된 값 (없을 수 있음)
+            temp_path_stored = file_info.get('temp_path') # ★★★ 이게 저장되어 있어야 함 ★★★
+            file_type = file_info.get('type')
+
+            # Workaround 핵심: original_filename 과 temp_path 가 있어야 진행 가능
+            if not original_filename:
+                 print(f"    ⚠️ SKIPPING file in '{storage_key}' due to MISSING 'original_filename'.")
+                 continue
+            if not temp_path_stored:
+                 print(f"    ⚠️ SKIPPING file '{original_filename}' (in '{storage_key}') due to MISSING 'temp_path'. Download impossible.")
+                 continue # temp_path 없으면 다운로드 불가하므로 스킵
+
+            # 다운로드 식별자 결정: processed_filename 있으면 그걸 쓰고, 없으면 original_filename 사용
+            download_identifier = processed_filename_stored if processed_filename_stored else original_filename
+            is_fallback = not bool(processed_filename_stored)
+
+            # 필요한 정보가 모두 있으므로 결과 목록에 추가
+            file_entry = {
+                'storage_key': storage_key,
+                'original_filename': original_filename,
+                # JS 호환성을 위해 'processed_filename' 필드에 식별자 전달
+                'processed_filename': download_identifier,
+                'type': file_type,
+                'size': file_info.get('size'),
+                'upload_timestamp': data.get('timestamp'),
+                'key_topic': metadata.get('key_topic'),
+                'target_name': metadata.get('name'),
+                'target_phone': metadata.get('phone'),
+                'target_region': metadata.get('region'),
+                'target_email': metadata.get('email'),
+                # 'is_fallback_identifier': is_fallback # 디버깅용 플래그 (옵션)
+            }
+            status = f"Identifier: {download_identifier}" + (" (Original used)" if is_fallback else "")
+            print(f"    + ADDING file: '{original_filename}' (Type: {file_type}, {status}, SK: {storage_key})")
+            found_files_metadata.append(file_entry)
+
+    print(f"✅ 검색 완료 [Workaround]. 총 {len(found_files_metadata)}개의 파일 메타데이터를 반환합니다.")
+    return jsonify({"files": found_files_metadata}), 200
+
+
+@api_bp.route("/api/memory/download_text/<string:storage_key>", methods=['GET'])
+def download_memory_text(storage_key):
+    """
+    주어진 storage_key에 해당하는 메모리 데이터의 텍스트 내용(기본: 요약)을
+    .txt 파일로 다운로드합니다. 인증 및 소유권 확인이 필요합니다.
+    """
+    print(f"--- '/api/memory/download_text/{storage_key}' 요청 처리 시작 ---")
+    uploader_uid = None
+
+    # --- 인증 로직 (기존 /api/memory/<storage_key> 와 동일) ---
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return jsonify({"error": "인증 토큰 필요"}), 401
+    id_token = auth_header.split('Bearer ')[1]
+    try:
+        # 실제 Firebase Admin SDK의 auth 객체를 사용해야 합니다.
+        # auth 객체가 routes.py에서 사용 가능하도록 초기화/import 필요
+        global auth # auth 객체가 전역적으로 사용 가능하다고 가정
+        decoded_token = auth.verify_id_token(id_token)
+        uploader_uid = decoded_token['uid']
+        print(f"ℹ️ /api/memory/download_text 요청 사용자 UID: {uploader_uid}")
+    except Exception as e:
+        print(f"🚨 /api/memory/download_text: 토큰 검증 오류: {e}")
+        # traceback.print_exc() # 필요시 상세 오류 출력
+        return jsonify({"error": "인증 오류", "detail": str(e)}), 401
+    # --- 인증 로직 끝 ---
+
+    data_item = None
+    # --- 데이터 조회 로직 (사용자 데이터 우선 확인) ---
+    # user_memory_storage 가 routes.py 에서 사용 가능해야 함
+    global user_memory_storage
+    if uploader_uid and uploader_uid in user_memory_storage and storage_key in user_memory_storage[uploader_uid]:
+        data_item = user_memory_storage[uploader_uid][storage_key]
+    # (필요시 admin_memory_storage 확인 로직 추가)
+
+    if not data_item:
+        print(f"⚠️ Key '{storage_key}' 를 사용자 '{uploader_uid}' 메모리에서 찾을 수 없음.")
+        return jsonify({"error": "데이터 찾을 수 없음"}), 404
+    # --- 데이터 조회 끝 ---
+
+    # --- 다운로드할 텍스트 내용 선택 ---
+    content_type_requested = request.args.get('content', 'summary') # 기본값 'summary'
+    text_to_download = None
+    filename_part = "document" # 기본 파일명 부분
+
+    if content_type_requested == 'summary' and 'summary' in data_item:
+        text_to_download = data_item['summary']
+        filename_part = "summary"
+    elif content_type_requested == 'content' and 'files_content' in data_item: # 예: OCR 결과
+        text_to_download = data_item['files_content']
+        filename_part = "content"
+    elif content_type_requested == 'original' and 'original' in data_item: # 예: STT 결과
+        text_to_download = data_item['original']
+        filename_part = "original"
+    else: # 요청한 타입이 없거나 기본 'summary'가 없을 경우
+         if 'summary' in data_item: # fallback으로 summary 시도
+             text_to_download = data_item['summary']
+             filename_part = "summary"
+         elif 'files_content' in data_item: # 그 다음 files_content 시도
+              text_to_download = data_item['files_content']
+              filename_part = "content"
+         elif 'original' in data_item: # 마지막으로 original 시도
+              text_to_download = data_item['original']
+              filename_part = "original"
+
+
+    # --- ▼▼▼ 디버깅 로그 추가 ▼▼▼ ---
+    summary_value_debug = data_item.get('summary') # .get() 사용하면 키가 없어도 오류 안 남
+    files_content_value_debug = data_item.get('files_content')
+    original_value_debug = data_item.get('original')
+    print(f"DEBUG LOG [download_memory_text]: storage_key='{storage_key}', requested='{content_type_requested}'")
+    print(f"DEBUG LOG [download_memory_text]: Found data_item? {'Yes' if data_item else 'No'}")
+    print(f"DEBUG LOG [download_memory_text]: Value of data_item['summary'] is: '{summary_value_debug}'")
+    print(f"DEBUG LOG [download_memory_text]: Type of data_item['summary'] is: {type(summary_value_debug)}")
+    print(f"DEBUG LOG [download_memory_text]: Value of data_item['files_content'] is present? {'Yes' if files_content_value_debug else 'No'}")
+    print(f"DEBUG LOG [download_memory_text]: Value of data_item['original'] is present? {'Yes' if original_value_debug else 'No'}")
+    print(f"DEBUG LOG [download_memory_text]: Value selected for text_to_download: '{str(text_to_download)[:100]}...'") # 값의 일부만 출력
+    print(f"DEBUG LOG [download_memory_text]: Type of selected text_to_download: {type(text_to_download)}")
+    # --- ▲▲▲ 디버깅 로그 추가 끝 ▲▲▲ ---
+
+
+    # 404 반환 조건 검사
+    if not text_to_download or not isinstance(text_to_download, str):
+         print(f"⚠️ Key '{storage_key}' 에 다운로드할 텍스트 내용(요청: {content_type_requested}, 선택됨: {filename_part}) 없음. Returning 404.") # 로그 명확화
+         return jsonify({"error": "다운로드할 텍스트 내용 없음"}), 404
+    # --- 텍스트 내용 선택 끝 ---
+
+
+    # --- 다운로드 파일명 생성 ---
+    # sanitize_filename 함수가 routes.py에서 사용 가능해야 함
+    global sanitize_filename
+    metadata = data_item.get('metadata', {})
+    client_name = sanitize_filename(metadata.get('name', 'unknown'))
+    key_topic = sanitize_filename(metadata.get('key_topic', 'doc'))
+    # 타임스탬프에서 날짜 부분만 추출 (YYYY-MM-DD 형식)
+    timestamp_str = data_item.get('timestamp', datetime.now().isoformat()).split('T')[0]
+    download_filename = f"{client_name}_{key_topic}_{timestamp_str}_{filename_part}.txt"
+    # --- 파일명 생성 끝 ---
+
+    # --- 텍스트 파일 생성 및 전송 ---
+    try:
+        # 텍스트를 UTF-8 바이트로 인코딩
+        text_bytes = text_to_download.encode('utf-8')
+        # BytesIO를 사용하여 메모리 내 바이트 스트림 생성
+        buffer = BytesIO(text_bytes)
+        buffer.seek(0) # 스트림 포인터를 처음으로 이동
+
+        print(f"✅ 텍스트 파일 전송 시작: {download_filename} ({len(text_bytes)} bytes)")
+        # send_file을 사용하여 메모리 버퍼에 있는 내용을 파일로 전송
+        return send_file(
+            buffer,
+            mimetype='text/plain',           # Mime 타입 지정
+            as_attachment=True,              # 첨부파일로 다운로드되도록 설정
+            download_name=download_filename  # 다운로드될 파일 이름 지정
+        )
+    except Exception as e:
+        print(f"🚨🚨🚨 텍스트 파일 생성/전송 중 오류 발생: {e}")
+        traceback.print_exc()
+        return jsonify({"error": "텍스트 파일 다운로드 중 서버 오류", "detail": str(e)}), 500
+    # --- 텍스트 파일 생성 및 전송 끝 ---
+    # --- 텍스트 파일 생성 및 전송 끝 ---
+
+
+# --- /admin/files/download (Workaround 수정) ---
+@api_bp.route("/admin/files/download", methods=['GET'])
+def admin_download_file_logic():
+    print(f"--- '/admin/files/download' [Workaround] 요청 처리 시작 ---")
+
+    # 1. 인증 및 uploader_uid 획득 (수정 완료된 버전)
+    auth_header = request.headers.get('Authorization')
+    id_token = None
+    uploader_uid = None # 초기화
+
+    if auth_header and auth_header.startswith('Bearer '):
+        id_token = auth_header.split('Bearer ')[1]
+
+    if not id_token:
+        print("🚨 /admin/files/download: Authorization 헤더 없거나 Bearer 토큰 아님.")
+        return jsonify({"error": "인증 토큰 필요"}), 401
+
+    try:
+        # 토큰 검증 시도
+        decoded_token = auth.verify_id_token(id_token)
+        uploader_uid = decoded_token['uid']
+        print(f"ℹ️ /admin/files/download [Workaround] 요청자 UID: {uploader_uid}")
+    except Exception as e:
+        # 오류 발생 시 로그 출력! (상세 내용 포함)
+        print(f"🚨 /admin/files/download [Workaround] 토큰 검증 오류: {e}")
+        return jsonify({"error": "인증 오류", "detail": str(e)}), 401
+
+    # 2. 파라미터 가져오기
+    storage_key_to_download = request.args.get('storageKey', '').strip()
+    # list API가 반환한 식별자 (processed_filename 또는 original_filename)
+    identifier_from_request = request.args.get('processedFilename', '').strip()
+
+    print(f"ℹ️ 다운로드 요청 [Workaround] - SK: '{storage_key_to_download}', Identifier(PFN/Orig): '{identifier_from_request}'")
+    if not storage_key_to_download or not identifier_from_request:
+        print("🚨 필수 파라미터 누락 (storageKey 또는 processedFilename)")
+        return jsonify({"error": "필수 파라미터 누락"}), 400
+
+    # 3. 스토리지에서 파일 정보 찾기
+    # user_memory_storage 구조 및 uploader_uid 유효성 검사
+    if uploader_uid not in user_memory_storage or storage_key_to_download not in user_memory_storage.get(uploader_uid, {}):
+         print(f"🚨 데이터 항목 없음 - UID: {uploader_uid}, SK: {storage_key_to_download}")
+         return jsonify({"error": "데이터 항목 없음", "storageKey": storage_key_to_download}), 404
+
+    data_entry = user_memory_storage[uploader_uid][storage_key_to_download]
+    files_info_list = data_entry.get('metadata', {}).get('uploaded_files_info', [])
+
+    file_info_to_download = None
+    for file_info in files_info_list:
+        # 식별자와 일치하는 파일 정보 찾기 (processed_filename 우선, 없으면 original_filename)
+        if file_info.get('processed_filename') and file_info.get('processed_filename') == identifier_from_request:
+            file_info_to_download = file_info; print(f"  -> Found file by matching stored 'processed_filename'.")
+            break
+        elif not file_info.get('processed_filename') and file_info.get('original_filename') == identifier_from_request:
+             file_info_to_download = file_info; print(f"  -> Found file by matching stored 'original_filename' (processed_filename was missing).")
+             break
+
+    if not file_info_to_download:
+        print(f"🚨 SK '{storage_key_to_download}' 에서 Identifier '{identifier_from_request}' 와 일치하는 파일 정보 못 찾음.")
+        return jsonify({"error": "파일 정보 찾기 실패", "identifier": identifier_from_request}), 404
+
+    # 4. temp_path 로 실제 파일 찾고 전송
+    temp_file_path = file_info_to_download.get('temp_path') # ★★★ 중요: 업로드 시 저장 필수 ★★★
+    original_filename_for_download = file_info_to_download.get('original_filename', 'downloaded_file')
+
+    if not temp_file_path:
+        print(f"🚨 CRITICAL: Identifier '{identifier_from_request}' 파일 정보는 찾았으나 'temp_path'가 저장 안됨! 업로드 로직 확인 필요.")
+        return jsonify({"error": "서버 파일 경로(temp_path) 정보 누락"}), 500
+
+    if not os.path.exists(temp_file_path):
+        print(f"🚨 CRITICAL: 서버에 파일 없음! Path: {temp_file_path}")
+        return jsonify({"error": "서버 파일 찾기 실패"}), 500
+
+    # --- 파일 전송 시도 ---
+    print(f"✅ 파일 전송 시작 [Workaround]: {temp_file_path} (다운로드 이름: {original_filename_for_download})")
+    try:
+        # 실제 파일 전송
+        response = send_file(
+            temp_file_path,
+            as_attachment=True,
+            download_name=original_filename_for_download,
+            # mimetype=file_info_to_download.get('mime_type') # 필요시 마임타입 지정
+        )
+        return response # 성공 시 Response 객체 반환
+    except Exception as e:
+        # send_file 자체에서 오류 발생 시 상세 내용 로깅
+        print(f"🚨🚨🚨 파일 전송 중 오류 발생 [Workaround]: {e}")
+        traceback.print_exc() # <<< 상세 Traceback 출력!
+        return jsonify({"error": "파일 전송 중 서버 오류", "detail": str(e)}), 500
+
+    # 이 함수는 모든 경로에서 return 문을 가지므로, 아래 코드는 이론상 도달하지 않아야 합니다.
+    # print("🚨🚨🚨 CRITICAL: Reached end of download function unexpectedly!")
+    # return jsonify({"error": "알 수 없는 서버 오류 (코드 흐름 이상)"}), 500
+
+
+print("--- [API Routes] Routes defined (including fixes for /admin/files/list) ---")
