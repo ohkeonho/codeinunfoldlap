@@ -78,7 +78,3 @@ FIREBASE_CRED_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_FIREBASE', 'parky
 
 # --- 기타 설정 ---
 ADMIN_EMAILS = ['admin@example.com'] # 실제 관리자 이메일 목록으로 교체
-
-# --- Flask App Config (메인 파일에서 사용) ---
-# 파일 크기 제한은 보통 Flask 앱 설정에 직접 넣는 것이 일반적임
-# MAX_FILE_SIZE = 50 * 1024 * 1024 # 필요하다면 여기서 정의하고 메인 파일에서 import
