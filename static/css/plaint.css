@@ -26,3 +26,155 @@
 
 /* --- 레이아웃 관련 모든 중복 스타일 제거됨 --- */
 
+/* 상세 목록 행 클릭 시 배경색 등 표시 */
+.member-row.active-detail-row {
+    background-color: #e0e0e0; /* 예시 색상 */
+}
+
+/* 상세 내용이 삽입될 행 */
+.detail-row-inserted td {
+    padding: 15px; /* JS의 인라인 스타일 이동 */
+    background-color: #f8f9fa; /* JS의 인라인 스타일 이동 */
+    border-bottom: 1px solid #dee2e6; /* JS의 인라인 스타일 이동 */
+}
+
+/* 상세 영역 전체 컨테이너 */
+.detail-area-container {
+    /* padding: 15px; */ /* TD에 이미 패딩이 있으므로 여기서 중복 가능 */
+}
+
+/* 상세 영역 제목 */
+.detail-title-1st { /* JS에서 제목 텍스트를 이 요소에 설정할 것입니다 */
+    margin-top: 0; /* JS의 인라인 스타일 이동 */
+    margin-bottom: 15px; /* JS의 인라인 스타일 이동 */
+    color: #333; /* JS의 인라인 스타일 이동 */
+}
+
+
+/* 각 항목 섹션 (헤더 + 내용) */
+.detail-item-section {
+    margin-bottom: 5px; /* 섹션 간 간격 */
+    border: 1px solid #dee2e6; /* 섹션 구분선 */
+    background-color: #fff; /* 섹션 배경 */
+}
+
+/* 1단계 헤더 (녹취록, 증거파일, 서면) */
+.detail-header-1st {
+    padding: 10px 15px; /* JS의 인라인 스타일 이동 */
+    cursor: pointer; /* JS의 인라인 스타일 이동 */
+    font-weight: bold; /* JS의 인라인 스타일 이동 */
+    border-bottom: 1px solid #dee2e6; /* JS의 인라인 스타일 이동 */
+    background-color: #e9ecef; /* JS의 인라인 스타일 이동 - 헤더 배경색 */
+    user-select: none; /* 텍스트 드래그 방지 */
+}
+
+/* 1단계 헤더 클릭 시 활성 상태 스타일 (선택 사항) */
+/* .detail-header-1st.active {
+    background-color: #dee2e6;
+} */
+
+
+/* 1단계 내용 영역 (처음에는 JS에서 display: none;으로 숨겨짐) */
+.detail-content-1st {
+    padding: 10px 15px; /* JS의 인라인 스타일 이동 */
+    border-bottom: 1px solid #eee; /* JS의 인라인 스타일 이동 */
+    background-color: #fff; /* JS의 인라인 스타일 이동 */
+    /* transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; */ /* 펼치기/접기 애니메이션 CSS (display: none과 함께 사용하기 어려움) */
+    overflow: hidden; /* 내용 넘침 숨김 */
+}
+
+/* 내용 영역 내부의 목록 스타일 */
+.detail-content-1st ul {
+    list-style: disc; /* JS의 인라인 스타일 이동 */
+    padding: 0 20px; /* JS의 인라인 스타일 이동 */
+    margin: 10px 0; /* JS의 인라인 스타일 이동 */
+}
+
+.detail-content-1st ul.no-list-style { /* renderCombinedDocumentListContent용 */
+    list-style: none; /* JS의 인라인 스타일 이동 */
+    padding: 0; /* JS의 인라인 스타일 이동 */
+    margin: 10px 0; /* JS의 인라인 스타일 이동 */
+}
+
+
+/* 2단계 상세 영역 컨테이너 (서면 내용 안에 들어감) */
+.detail-area-container-2nd {
+    margin-top: 15px; /* 1단계 헤더/내용과의 간격 */
+    border-top: 1px solid #dee2e6; /* 구분선 */
+    padding-top: 15px;
+}
+
+/* 2단계 가로 탭 버튼 컨테이너 */
+.horizontal-tabs-2nd {
+    margin-bottom: 10px; /* JS의 인라인 스타일 이동 */
+    border-bottom: 1px solid #dee2e6; /* JS의 인라인 스타일 이동 */
+}
+
+/* 2단계 탭 버튼 */
+.tab-button-2nd {
+    padding: 10px 15px; /* JS의 인라인 스타일 이동 */
+    border: none; /* JS의 인라인 스타일 이동 */
+    background-color: transparent; /* JS의 인라인 스타일 이동 */
+    cursor: pointer; /* JS의 인라인 스타일 이동 */
+    outline: none; /* JS의 인라인 스타일 이동 */
+    border-bottom: 2px solid transparent; /* JS의 인라인 스타일 이동 */
+    transition: border-bottom-color 0.2s ease; /* 호버 및 활성 시 애니메이션 */
+}
+
+/* 2단계 탭 버튼 호버 스타일 */
+.tab-button-2nd:hover {
+    border-bottom-color: #007bff; /* 호버 색상 */
+}
+
+/* 2단계 탭 버튼 활성 상태 스타일 */
+.tab-button-2nd.active {
+    font-weight: bold; /* JS에서 줬을 수 있음 */
+    border-bottom-color: #007bff; /* JS의 인라인 스타일 이동 */
+}
+
+/* 2단계 탭 내용 컨테이너 */
+.detail-content-area-2nd {
+    /* padding-top: 10px; */ /* 내용 영역 상단 패딩 */
+}
+
+/* 2단계 탭 내용 (JS에서 display: none/block 제어) */
+.tab-content-2nd {
+    /* padding: 10px; */ /* 필요시 내용 자체 패딩 */
+}
+
+/* 데이터 없음 메시지 스타일 */
+.no-data {
+     text-align: center;
+     color: #6c757d; /* 회색 계열 */
+     font-style: italic;
+}
+
+/* renderCombinedDocumentListContent 내 li 스타일 */
+.detail-content-1st ul li {
+     margin-bottom: 15px; /* JS 인라인 스타일 이동 */
+     padding-bottom: 10px; /* JS 인라인 스타일 이동 */
+     border-bottom: 1px dashed #ddd; /* JS 인라인 스타일 이동 */
+}
+.detail-content-1st ul li:last-child {
+     border-bottom: none; /* 마지막 항목 하단 경계선 제거 */
+     margin-bottom: 0;
+     padding-bottom: 0;
+}
+
+.detail-content-1st ul li strong {
+     color: #333; /* 제목 색상 */
+}
+.detail-content-1st ul li strong small {
+     color: #555; /* 요약 색상 */
+}
+
+/* renderCombinedDocumentListContent의 문서 종류 색상 */
+.detail-content-1st ul li strong .document-topic {
+     color: #007bff; /* JS 인라인 스타일 이동 */
+}
+
+/* 파일/링크 리스트 스타일 (JS에서 class 추가) */
+.detail-content-1st ul.file-list {
+    list-style: disc;
+    padding-left: 40px; /* 들여쓰기 */
+}
