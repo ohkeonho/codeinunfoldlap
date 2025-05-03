@@ -365,7 +365,7 @@ a:hover { text-decoration: underline; }
 .memo-display-list .delete-memo-btn { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 0.9em; padding: 2px 5px; }
 .memo-display-list .delete-memo-btn:hover { color: #a71d2a; }
 hr.memo-divider { border: none; border-top: 1px solid #eee; margin: 15px 0; }
-#memo-text-input { display: block; width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical; margin-bottom: 10px; }
+#memo-text-input { display: block; width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; resize: none; margin-bottom: 10px; }
 #memo-input-area button {  margin-right: 5px; cursor: pointer; border: none; border-radius: 4px; }
 #memo-status { margin-top: 10px; font-size: 0.9em; }
 #memo-status.success { color: green; }
