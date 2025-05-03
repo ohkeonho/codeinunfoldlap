@@ -134,83 +134,54 @@ function renderInitialDocumentSummaryList(documents) {
 
 // === 특정 서면의 상세 내용을 불러와 모달 등에 표시 (텍스트 다운로드 링크로 수정) ===
 async function showDocumentDetail(storageKey, title) {
-    console.log(`[Plaint Modal Detail] Showing modal detail for key: ${storageKey}, title: ${title}`);
     const modal = document.getElementById('documentDetailModal');
     const contentDiv = document.getElementById('documentDetailContent');
     const titleSpan = document.getElementById('documentDetailTitle');
     const backdrop = document.getElementById('modalBackdrop');
-
-    if (!modal || !contentDiv || !titleSpan || !backdrop) {
-         console.error("[Plaint Modal Detail] Modal elements not found!");
-         alert("상세 정보 창을 열 수 없습니다.");
-         return;
-     }
+    if (!modal || !contentDiv || !titleSpan || !backdrop) { console.error("Modal elements missing!"); alert("상세 정보 창 오류"); return; }
 
     titleSpan.textContent = title || '상세 정보';
     contentDiv.innerHTML = '<p style="text-align:center; padding: 20px;">상세 정보 로딩 중...</p>';
-    modal.style.display = 'block';
-    backdrop.classList.add('active');
-
-    if (!currentUserToken_plaint) {
-         contentDiv.innerHTML = '<p style="color:red; text-align:center;">오류: 인증 토큰이 없습니다.</p>';
-         return;
-    }
+    modal.style.display = 'block'; backdrop.classList.add('active');
+    if (!currentUserToken_plaint) { contentDiv.innerHTML = '<p style="color:red; text-align:center;">오류: 인증 토큰 없음</p>'; return; }
 
     const detailApiEndpoint = `/api/memory/${encodeURIComponent(storageKey)}`;
     try {
         const response = await fetch(detailApiEndpoint, { headers: { 'Authorization': `Bearer ${currentUserToken_plaint}` } });
         if (!response.ok) throw new Error(`서버 오류 (${response.status})`);
         const data = await response.json();
-        console.log("DEBUG: /api/memory response data:", JSON.stringify(data, null, 2));
 
-        // --- ▼▼▼ 텍스트 다운로드 링크 생성 (수정됨) ▼▼▼ ---
+        // --- 텍스트 다운로드 링크 생성 ---
         let downloadLinkHtml = '';
-        const textDownloadUrl = `/api/memory/download_text/${encodeURIComponent(storageKey)}`;
-        const summaryDownloadUrl = `${textDownloadUrl}?content=summary`;
-        const contentDownloadUrl = `${textDownloadUrl}?content=content`;
-        const originalDownloadUrl = `${textDownloadUrl}?content=original`;
-
+        const textDownloadBaseUrl = `/api/memory/download_text/${encodeURIComponent(storageKey)}`;
         const metadata = data.metadata || {};
         const clientName = sanitizeFilenameForJS(metadata.name || 'unknown');
         const keyTopic = sanitizeFilenameForJS(metadata.key_topic || 'doc');
         const timestampStr = (data.timestamp || '').split('T')[0] || 'nodate';
-        const summaryFilename = `${clientName}_${keyTopic}_${timestampStr}_summary.txt`;
-        const contentFilename = `${clientName}_${keyTopic}_${timestampStr}_content.txt`;
-        const originalFilename = `${clientName}_${keyTopic}_${timestampStr}_original.txt`;
 
         if (data.summary) {
-            downloadLinkHtml += `
-                 <a href="${summaryDownloadUrl}" download="${summaryFilename}" target="_blank" rel="noopener noreferrer" style="cursor: pointer; color: #007bff; text-decoration: underline; font-weight: bold; font-size: 0.9em; margin-left: 15px;" title="${summaryFilename} 다운로드">
-                    [요약 다운로드]
-                 </a>`;
+            const summaryFilename = `${clientName}_${keyTopic}_${timestampStr}_summary.txt`;
+            const summaryDownloadUrl = `${textDownloadBaseUrl}?content=summary`;
+            downloadLinkHtml += `<a href="#" class="text-download-link" data-download-url="${summaryDownloadUrl}" data-download-filename="${summaryFilename}" style="cursor: pointer; color: #007bff; text-decoration: underline; font-weight: bold; font-size: 0.9em; margin-left: 15px;" title="${summaryFilename} 다운로드"><i class="fas fa-file-alt"></i> [요약 다운로드]</a>`;
         }
-
         const mainContent = data.files_content || data.original;
         if (mainContent) {
-             const mainContentDownloadUrl = data.files_content ? contentDownloadUrl : originalDownloadUrl;
-             const mainContentFilename = data.files_content ? contentFilename : originalFilename;
-             downloadLinkHtml += `
-                 <a href="${mainContentDownloadUrl}" download="${mainContentFilename}" target="_blank" rel="noopener noreferrer" style="cursor: pointer; color: #007bff; text-decoration: underline; font-weight: bold; font-size: 0.9em; margin-left: 15px;" title="${mainContentFilename} 다운로드">
-                    [원문/내용 다운로드]
-                 </a>`;
+            const isContent = !!data.files_content;
+            const mainContentDownloadUrl = `${textDownloadBaseUrl}?content=${isContent ? 'content' : 'original'}`;
+            const mainContentFilename = `${clientName}_${keyTopic}_${timestampStr}_${isContent ? 'content' : 'original'}.txt`;
+            downloadLinkHtml += `<a href="#" class="text-download-link" data-download-url="${mainContentDownloadUrl}" data-download-filename="${mainContentFilename}" style="cursor: pointer; color: #007bff; text-decoration: underline; font-weight: bold; font-size: 0.9em; margin-left: 15px;" title="${mainContentFilename} 다운로드"><i class="fas fa-file-alt"></i> [원문/내용 다운로드]</a>`;
         }
+        if (downloadLinkHtml) { downloadLinkHtml = `<div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; text-align: right;">${downloadLinkHtml}</div>`; }
+        else { downloadLinkHtml = `<div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; text-align: right; color: grey; font-size: 0.9em;">다운로드 가능한 텍스트 내용 없음</div>`; }
 
-        if(downloadLinkHtml) {
-            downloadLinkHtml = `<div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; text-align: right;">${downloadLinkHtml}</div>`;
-        } else {
-            downloadLinkHtml = `<div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; text-align: right; color: grey; font-size: 0.9em;">다운로드 가능한 텍스트 내용 없음</div>`;
-        }
-        // --- ▲▲▲ 텍스트 다운로드 링크 생성 끝 ▲▲▲ ---
-
+        // --- 내용 표시 ---
         const mainContentText = data.files_content || data.original || '[원문/내용 없음]';
         contentDiv.innerHTML = `
-            <h4>요약</h4><p style="white-space: pre-wrap;">${escapeHtml(data.summary || '[요약 없음]')}</p>
-            <h4>원문/내용</h4><pre style="white-space: pre-wrap; word-wrap: break-word; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; max-height: 300px; overflow-y: auto;">${escapeHtml(mainContentText)}</pre>
-            ${downloadLinkHtml}
-        `;
-
-        console.log("[Plaint Modal Detail] Content loaded successfully.");
-
+             <h4>요약</h4><p style="white-space: pre-wrap;">${escapeHtml(data.summary || '[요약 없음]')}</p>
+             <h4>원문/내용</h4><pre style="white-space: pre-wrap; word-wrap: break-word; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; max-height: 300px; overflow-y: auto;">${escapeHtml(mainContentText)}</pre>
+             ${downloadLinkHtml}
+         `;
+        console.log("[Plaint Modal Detail] Content loaded.");
     } catch (error) {
         console.error('[Plaint Modal Detail] Error loading detail:', error);
         contentDiv.innerHTML = `<p style="color:red; text-align:center;">상세 정보 로드 오류: ${escapeHtml(error.message)}</p>`;
@@ -263,15 +234,7 @@ async function showInlineDocumentDetail(storageKey, clickedHeaderElement) {
 
             const summaryText = escapeHtml(detailData.summary || '[요약 정보 없음]');
 
-            if (detailData.summary) {
-                inlineDownloadLinkHtml = `
-                    <a href="${summaryDownloadUrlInline}" download="${summaryFilenameInline}" target="_blank" rel="noopener noreferrer" style="cursor: pointer; color: #007bff; text-decoration: underline; font-size: 0.9em;" title="${summaryFilenameInline} 다운로드">
-                       [요약 다운로드]
-                    </a>`;
-                 inlineDownloadLinkHtml = `<div style="margin-top: 10px; text-align: right;">${inlineDownloadLinkHtml}</div>`;
-            } else {
-                 inlineDownloadLinkHtml = `<div style="margin-top: 10px; text-align: right; color: grey; font-size: 0.9em;">다운로드 가능한 요약 없음</div>`;
-            }
+            
             // --- ▲▲▲ 텍스트 다운로드 링크 생성 끝 ▲▲▲ ---
 
             detailContentDiv.innerHTML = `
