@@ -321,7 +321,62 @@ a:hover { text-decoration: underline; }
     display: none;
 }
 
-
+.calendar-memo-container {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    margin-top: 15px;
+    width: 100%; /* 컨테이너 너비 */
+}
+.calendar-column {
+    flex: 0 1 350px; /* 캘린더 너비 고정 또는 비율 */
+    min-width: 300px;
+}
+.memo-column {
+    flex: 1 1 auto;
+    padding: 15px;
+    margin: auto;
+    border: 1px solid #eee;
+    border-radius: 5px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.memo-display-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.memo-display-header h4 { margin: 0; font-size: 1.1em; color: #333;}
+#memo-selected-date { font-weight: bold; color: #007bff; }
+.memo-display-list {
+    min-height: 60px;
+    max-height: 150px;
+    overflow-y: auto;
+    background-color: #f9f9f9;
+    border: 1px dashed #ddd;
+    padding: 10px;
+    margin-bottom: 15px;
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+.memo-display-list p { margin: 0 0 5px 0; padding: 5px; background-color: #fff; border-radius: 3px; display: flex; justify-content: space-between; align-items: center; }
+.memo-display-list p span { flex-grow: 1; margin-right: 5px; word-break: break-all; }
+.memo-display-list .delete-memo-btn { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 0.9em; padding: 2px 5px; }
+.memo-display-list .delete-memo-btn:hover { color: #a71d2a; }
+hr.memo-divider { border: none; border-top: 1px solid #eee; margin: 15px 0; }
+#memo-text-input { display: block; width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical; margin-bottom: 10px; }
+#memo-input-area button {  margin-right: 5px; cursor: pointer; border: none; border-radius: 4px; }
+#memo-status { margin-top: 10px; font-size: 0.9em; }
+#memo-status.success { color: green; }
+#memo-status.error { color: red; }
+.fc-daygrid-day-number .memo-dot { background-color: #ff9f89; border-radius: 50%; width: 6px; height: 6px; display: inline-block; margin-left: 4px; vertical-align: middle; }
+.button-icon { background: none; border: none; font-size: 1em; color: #6c757d; cursor: pointer; padding: 5px; }
+.button-icon:hover { color: #343a40; }
+ /* 프로필 헤더 레이아웃 조정 */
+ .profile-header { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px; }
+ .profile-header .contain { flex: 1 1 auto; min-width: 200px; /* 프로필 최소 너비 */ }
+ .calendar-memo-container { flex: 1 1 500px; min-width: 400px; }
 
 /* ▲▲▲ --------------------------------------------- ▲▲▲ */
 

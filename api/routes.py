@@ -1548,132 +1548,7 @@ def debug_memory_contents():
         return jsonify({"error": "Failed to serialize memory content", "detail": str(e)}), 500
 
 
-@api_bp.route("/events", methods=['GET'])
-def get_calendar_events():
-    """
-    인증된 사용자의 user_memory_storage 데이터 항목들을 FullCalendar 이벤트 형식으로 반환합니다.
-    인증 토큰이 필요하며, 해당 사용자의 데이터만 조회합니다.
-    """
-    print(f"--- '/api/events' 요청 처리 시작 ---")
-    uploader_uid = None # 요청자의 UID (Firebase에서 검증 후 얻음)
-    # user_memory_storage 전역 변수 사용 명시
-    global user_memory_storage
-    # Firebase Admin SDK의 auth 객체가 초기화되어 있는지 확인
-    if not auth:
-        print("🚨 /api/events: Firebase Auth object not available.")
-        return jsonify({"error": "서버 인증 시스템 오류"}), 500
 
-    try:
-        # --- ▼▼▼ ID 토큰 확인 및 UID 얻기 (인증 필수) ▼▼▼ ---
-        # Authorization 헤더에서 Bearer 토큰 추출
-        auth_header = request.headers.get('Authorization')
-        id_token = None
-        if auth_header and auth_header.startswith('Bearer '):
-            id_token = auth_header.split('Bearer ')[1]
-
-        # 1. 토큰 존재 여부 확인 (없으면 401 Unauthorized)
-        if not id_token:
-            print("🚨 /api/events: Authorization 헤더 없거나 Bearer 토큰 아님. 인증 실패.")
-            return jsonify({"error": "인증 토큰이 필요합니다."}), 401
-
-        # 2. 토큰 검증 (실패 시 401 또는 500)
-        try:
-            decoded_token = auth.verify_id_token(id_token)
-            uploader_uid = decoded_token['uid'] # <<< 로그인된 사용자의 UID 획득!
-            requester_email = decoded_token.get('email', '이메일 정보 없음') # 이메일 정보 (로깅/확인용)
-            print(f"ℹ️ /api/events 요청 사용자 UID: {uploader_uid}, Email: {requester_email}")
-
-        except auth.InvalidIdTokenError as e:
-            print(f"🚨 /api/events: 유효하지 않은 ID 토큰: {e}")
-            # 유효하지 않은 토큰이므로 401 반환
-            return jsonify({"error": "유효하지 않은 인증 토큰입니다.", "detail": str(e)}), 401
-        except Exception as e: # 토큰 검증 중 다른 오류
-            print(f"🚨 /api/events: 토큰 검증 오류: {e}")
-            traceback.print_exc() # 서버 콘솔에 상세 오류 출력
-            # 기타 검증 오류 시 500 반환
-            return jsonify({"error": "토큰 검증 중 오류 발생", "detail": str(e)}), 500
-        # --- ▲▲▲ ID 토큰 확인 및 UID 얻기 완료 ▲▲▲ ---
-
-        # 이 시점 이후에는 uploader_uid 가 항상 유효한 값이어야 합니다.
-
-        # --- 사용자 데이터 조회 및 FullCalendar 이벤트 형식으로 변환 ---
-        calendar_events = []
-
-        # user_memory_storage에서 현재 로그인된 사용자의 데이터만 가져옴
-        user_specific_data = user_memory_storage.get(uploader_uid, {})
-
-        print(f"ℹ️ UID '{uploader_uid}'의 데이터 {len(user_specific_data)}개 확인. 이벤트로 변환 시작.")
-
-        # 각 데이터 항목을 순회하며 FullCalendar 이벤트 형식으로 변환
-        for storage_key, data_item in user_specific_data.items():
-            try:
-                # data_item이 유효한 딕셔너리인지 확인
-                if not isinstance(data_item, dict):
-                    print(f"WARN: UID '{uploader_uid}'의 저장소에 유효하지 않은 항목 스킵: {storage_key}")
-                    continue
-
-                # 필요한 데이터 추출 (None 방지)
-                metadata = data_item.get('metadata', {})
-                timestamp_iso = data_item.get('timestamp') # ISO 8601 형식 시간 문자열
-                # source = data_item.get('source', 'unknown') # 필요시 이벤트 속성에 추가 가능
-
-                # FullCalendar 이벤트의 title 생성
-                item_topic = metadata.get('key_topic', '자료') # 문서 종류 (예: 고소장, 보충이유서)
-                item_name = metadata.get('name', '정보없음') # 의뢰인 이름
-                event_title = f"[{item_topic}] {item_name}" # 예: "[고소장] 김철수" 또는 "[자료] 홍길동"
-
-                # FullCalendar 이벤트의 start 시간 (timestamp 사용)
-                event_start = None
-                if timestamp_iso:
-                    try:
-                        # ISO 8601 문자열을 datetime 객체로 파싱 (선택적, FullCalendar는 ISO 문자열도 받음)
-                        # dt_object = datetime.fromisoformat(timestamp_iso)
-                        # event_start = dt_object.isoformat() # 다시 ISO 문자열로 (시간대 정보 유지)
-                        # FullCalendar는 ISO 8601 문자열을 start 속성으로 잘 처리하므로 그대로 사용
-                        event_start = timestamp_iso
-                    except ValueError:
-                        print(f"WARN: 유효하지 않은 타임스탬프 형식 (키: {storage_key}): {timestamp_iso}")
-                        # 유효하지 않으면 이 이벤트는 추가하지 않거나 start를 None으로 설정
-                        continue # 유효한 start 시간이 없으면 이벤트 목록에 추가하지 않음
-
-                # FullCalendar 이벤트 객체 생성
-                event_object = {
-                    'id': storage_key, # FullCalendar는 이벤트 ID로 사용
-                    'title': event_title,
-                    'start': event_start, # ISO 8601 형식 문자열
-                    # 'end': '...', # 종료 시간이 있다면 추가 (없으면 한 시점 이벤트)
-                    # 'allDay': True/False, # 종일 이벤트 여부 (start 시간만 있다면 True로 간주될 수 있음)
-                    # extendedProps에 상세 정보 저장 (클라이언트 eventClick 시 활용)
-                    'extendedProps': {
-                        'name': metadata.get('name', 'N/A'),
-                        'phone': metadata.get('phone', 'N/A'),
-                        'region': metadata.get('region', 'N/A'),
-                        'source': data_item.get('source', 'unknown'),
-                        'user_email': metadata.get('user_email', requester_email), # 대상 의뢰인 이메일
-                        'uploader_email': metadata.get('uploader_email', requester_email), # 업로더 이메일 (admin 업로드용)
-                        'key_topic': item_topic,
-                        'summary_preview': data_item.get('summary', '')[:100] + '...' # 요약 미리보기 (전체 요약은 너무 길 수 있음)
-                    }
-                }
-
-                # 생성된 이벤트 객체를 리스트에 추가
-                calendar_events.append(event_object)
-
-            except Exception as item_e:
-                # 개별 항목 처리 중 오류 발생 시 로깅하고 계속 진행
-                print(f"🚨 UID '{uploader_uid}'의 항목 '{storage_key}' 처리 중 오류 발생: {item_e}")
-                traceback.print_exc() # 오류 상세 정보 출력 (개발 중 유용)
-                # 이 항목은 calendar_events 리스트에 추가되지 않음
-
-        # --- 이벤트 목록 JSON 응답 ---
-        print(f"--- '/api/events' 처리 완료. 총 {len(calendar_events)}개 이벤트 반환 ---")
-        return jsonify(calendar_events), 200 # 성공 시 200 OK 상태 코드와 함께 이벤트 목록 반환
-
-    except Exception as e:
-        # 인증 오류 외 다른 예상치 못한 오류 처리
-        print(f"🚨 '/api/events' 요청 처리 중 예외 발생: {e}")
-        traceback.print_exc() # 서버 콘솔에 전체 스택 트레이스 출력
-        return jsonify({"error": "이벤트 데이터 생성 중 서버 오류 발생", "detail": str(e)}), 500
 # 나머지 기존 Flask 라우트 및 코드들 ...
 # if __name__ == '__main__':
 #     app.run(...)
@@ -1985,4 +1860,270 @@ def admin_download_file_logic():
     # return jsonify({"error": "알 수 없는 서버 오류 (코드 흐름 이상)"}), 500
 
 
-print("--- [API Routes] Routes defined (including fixes for /admin/files/list) ---")
+@api_bp.route("/calendar/memos", methods=['GET'])
+def get_calendar_memos():
+    """
+    인증된 사용자의 캘린더 메모 목록을 FullCalendar 이벤트 형식으로 반환합니다.
+    """
+    print(f"--- '/api/calendar/memos' [GET] 요청 처리 시작 ---")
+    requester_uid = None
+    requester_email = '이메일 정보 없음'
+    global user_memory_storage, auth
+
+    if not auth:
+        print("🚨 /api/calendar/memos: Firebase Auth object not available.")
+        return jsonify({"error": "서버 인증 시스템 오류"}), 500
+
+    try:
+        # --- ▼▼▼ ID 토큰 확인 및 UID 얻기 (인증 필수) ▼▼▼ ---
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            print("🚨 /api/calendar/memos: 인증 토큰 없음.")
+            return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+
+        id_token = auth_header.split('Bearer ')[1]
+        try:
+            decoded_token = auth.verify_id_token(id_token)
+            requester_uid = decoded_token.get('uid')
+            requester_email = decoded_token.get('email', '이메일 정보 없음')
+            if not requester_uid:
+                 print("🚨 /api/calendar/memos: 유효 토큰이나 UID 정보 없음.")
+                 return jsonify({"error": "인증 토큰에 사용자 정보가 없습니다."}), 401
+            print(f"ℹ️ /api/calendar/memos [GET] 요청 사용자 UID: {requester_uid}, Email: {requester_email}")
+        except Exception as auth_err:
+            print(f"🚨 /api/calendar/memos: 토큰 검증 오류: {auth_err}")
+            # traceback.print_exc() # 필요시 상세 오류 출력
+            return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 401
+        # --- ▲▲▲ ID 토큰 확인 및 UID 얻기 완료 ▲▲▲ ---
+
+        # --- 사용자 데이터 조회 및 메모 필터링 ---
+        calendar_memos = []
+        user_specific_data = user_memory_storage.get(requester_uid, {})
+
+        print(f"ℹ️ UID '{requester_uid}'의 데이터 {len(user_specific_data)}개 확인. 'memo' 타입 필터링 시작.")
+
+        for storage_key, data_item in user_specific_data.items():
+            if isinstance(data_item, dict) and data_item.get('type') == 'memo':
+                try:
+                    memo_date = data_item.get('date') # YYYY-MM-DD 형식이어야 함
+                    memo_text = data_item.get('text', '')
+                    memo_timestamp = data_item.get('timestamp') # 생성/수정 시각
+
+                    if memo_date: # 날짜가 있어야 캘린더에 표시 가능
+                        calendar_memos.append({
+                            'id': storage_key,           # 메모 고유 ID (storage_key 사용)
+                            'title': memo_text,          # 이벤트 제목 = 메모 내용
+                            'start': memo_date,          # 이벤트 시작일 (YYYY-MM-DD)
+                            'allDay': True,              # 하루 종일 이벤트로 처리
+                            'extendedProps': {           # 클릭 시 상세 정보 표시용
+                                'text': memo_text,
+                                'timestamp': memo_timestamp,
+                                'type': 'memo'           # 타입 명시
+                            },
+                            # 필요시 색상 등 추가 가능
+                            # 'color': '#ff9f89' # 예시: 메모 이벤트 색상
+                        })
+                    else:
+                         print(f"⚠️ 메모 스킵 (키: {storage_key}): 'date' 필드 누락")
+
+                except Exception as item_e:
+                    print(f"🚨 메모 항목 (키: {storage_key}) 처리 중 오류 발생: {item_e}")
+                    traceback.print_exc()
+
+        print(f"--- '/api/calendar/memos' [GET] 처리 완료. 총 {len(calendar_memos)}개 메모 반환 ---")
+        return jsonify(calendar_memos), 200
+
+    except Exception as e:
+        print(f"🚨 '/api/calendar/memos' [GET] 요청 처리 중 예외 발생: {e}")
+        traceback.print_exc()
+        return jsonify({"error": "캘린더 메모 조회 중 서버 오류 발생", "detail": str(e)}), 500
+
+
+@api_bp.route("/calendar/memos", methods=['POST'])
+def add_calendar_memo():
+    """
+    인증된 사용자의 특정 날짜에 새 캘린더 메모를 추가합니다.
+    """
+    print(f"--- '/api/calendar/memos' [POST] 요청 처리 시작 ---")
+    requester_uid = None
+    requester_email = '이메일 정보 없음'
+    global user_memory_storage, auth
+
+    if not auth:
+        print("🚨 /api/calendar/memos [POST]: Firebase Auth object not available.")
+        return jsonify({"error": "서버 인증 시스템 오류"}), 500
+
+    # --- ▼▼▼ 인증 및 UID 얻기 (필수) ▼▼▼ ---
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        print("🚨 /api/calendar/memos [POST]: 인증 토큰 없음.")
+        return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+
+    id_token = auth_header.split('Bearer ')[1]
+    try:
+        decoded_token = auth.verify_id_token(id_token)
+        requester_uid = decoded_token.get('uid')
+        requester_email = decoded_token.get('email', '이메일 정보 없음')
+        if not requester_uid:
+             print("🚨 /api/calendar/memos [POST]: 유효 토큰이나 UID 정보 없음.")
+             return jsonify({"error": "인증 토큰에 사용자 정보가 없습니다."}), 401
+        print(f"ℹ️ /api/calendar/memos [POST] 요청 사용자 UID: {requester_uid}, Email: {requester_email}")
+    except Exception as auth_err:
+        print(f"🚨 /api/calendar/memos [POST]: 토큰 검증 오류: {auth_err}")
+        return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 401
+    # --- ▲▲▲ 인증 및 UID 얻기 완료 ▲▲▲ ---
+
+    # --- 입력 데이터 확인 ---
+    if not request.is_json:
+        print("🚨 /api/calendar/memos [POST]: 요청 형식이 JSON이 아님.")
+        return jsonify({"error": "요청 본문은 JSON 형식이어야 합니다."}), 400
+
+    data = request.get_json()
+    memo_date_str = data.get('date')
+    memo_text = data.get('text')
+
+    if not memo_date_str or not memo_text:
+        print("🚨 /api/calendar/memos [POST]: 필수 필드 누락 ('date', 'text').")
+        return jsonify({"error": "필수 필드('date', 'text')가 누락되었습니다."}), 400
+
+    # 날짜 형식 검증 (YYYY-MM-DD)
+    try:
+        datetime.strptime(memo_date_str, '%Y-%m-%d')
+    except ValueError:
+        print(f"🚨 /api/calendar/memos [POST]: 잘못된 날짜 형식: {memo_date_str}")
+        return jsonify({"error": "날짜는 'YYYY-MM-DD' 형식이어야 합니다."}), 400
+
+    memo_id = None # 롤백을 위해 초기화
+
+    try:
+        # --- 메모 데이터 생성 및 저장 ---
+        # 고유 ID 생성 (타임스탬프 기반)
+        memo_id = f"memo_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+
+        memo_data = {
+            'type': 'memo',
+            'date': memo_date_str,
+            'text': memo_text,
+            'timestamp': datetime.now(timezone.utc).isoformat(), # UTC 시간으로 저장
+            'metadata': { # 다른 데이터와의 일관성을 위해 metadata 사용
+                'user_email': requester_email # 작성자 이메일 저장 (선택적)
+            }
+        }
+
+        # 사용자 저장 공간 확인 및 생성
+        if requester_uid not in user_memory_storage:
+            user_memory_storage[requester_uid] = {}
+            print(f"DEBUG: Created new user folder in memory for UID: {requester_uid} (from /calendar/memos [POST])")
+
+        # 메모 저장
+        user_memory_storage[requester_uid][memo_id] = memo_data
+        print(f"✅ 새 메모 저장됨 (UID: {requester_uid}, Memo ID: {memo_id}, Date: {memo_date_str})")
+
+        # 성공 응답 (생성된 메모 정보 포함)
+        # FullCalendar 이벤트 형식으로 맞춰서 반환하면 프론트에서 바로 추가하기 용이
+        response_event = {
+             'id': memo_id,
+             'title': memo_text,
+             'start': memo_date_str,
+             'allDay': True,
+             'extendedProps': {
+                 'text': memo_text,
+                 'timestamp': memo_data['timestamp'],
+                 'type': 'memo'
+             }
+             # 'color': '#ff9f89' # 필요시 동일 색상 지정
+         }
+        return jsonify(response_event), 201 # 201 Created
+
+    except Exception as e:
+        print(f"🚨 '/api/calendar/memos' [POST] 메모 저장 중 예외 발생: {e}")
+        traceback.print_exc()
+
+        # --- 롤백 로직 ---
+        if requester_uid and memo_id and requester_uid in user_memory_storage and memo_id in user_memory_storage[requester_uid]:
+            try:
+                del user_memory_storage[requester_uid][memo_id]
+                print(f"🧹 오류 발생으로 메모 롤백됨 (UID: {requester_uid}, Memo ID: {memo_id})")
+            except KeyError:
+                 print(f"🧹 롤백 시도 중 키 이미 없음 (Memo ID: {memo_id})")
+            # 사용자 폴더가 비었으면 삭제 (선택적)
+            if not user_memory_storage[requester_uid]:
+                 try:
+                     del user_memory_storage[requester_uid]
+                     print(f"🧹 오류 발생으로 빈 사용자 폴더 삭제됨 (UID: {requester_uid})")
+                 except KeyError:
+                      pass
+
+        return jsonify({"error": "메모 저장 중 서버 오류 발생", "detail": str(e)}), 500
+
+
+@api_bp.route("/calendar/memos/<string:memo_id>", methods=['DELETE'])
+def delete_calendar_memo(memo_id):
+    """
+    인증된 사용자의 특정 캘린더 메모를 삭제합니다.
+    """
+    print(f"--- '/api/calendar/memos/{memo_id}' [DELETE] 요청 처리 시작 ---")
+    requester_uid = None
+    global user_memory_storage, auth
+
+    if not auth:
+        print(f"🚨 /api/calendar/memos/{memo_id} [DELETE]: Firebase Auth object not available.")
+        return jsonify({"error": "서버 인증 시스템 오류"}), 500
+
+    # --- ▼▼▼ 인증 및 UID 얻기 (필수) ▼▼▼ ---
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        print(f"🚨 /api/calendar/memos/{memo_id} [DELETE]: 인증 토큰 없음.")
+        return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+
+    id_token = auth_header.split('Bearer ')[1]
+    try:
+        decoded_token = auth.verify_id_token(id_token)
+        requester_uid = decoded_token.get('uid')
+        if not requester_uid:
+             print(f"🚨 /api/calendar/memos/{memo_id} [DELETE]: 유효 토큰이나 UID 정보 없음.")
+             return jsonify({"error": "인증 토큰에 사용자 정보가 없습니다."}), 401
+        print(f"ℹ️ /api/calendar/memos [DELETE] 요청 사용자 UID: {requester_uid}")
+    except Exception as auth_err:
+        print(f"🚨 /api/calendar/memos/{memo_id} [DELETE]: 토큰 검증 오류: {auth_err}")
+        return jsonify({"error": "인증 실패", "detail": str(auth_err)}), 401
+    # --- ▲▲▲ 인증 및 UID 얻기 완료 ▲▲▲ ---
+
+    try:
+        # --- 메모 존재 및 소유권 확인 ---
+        if requester_uid not in user_memory_storage:
+            print(f"⚠️ 삭제 요청 실패: 사용자 (UID: {requester_uid}) 데이터 없음.")
+            return jsonify({"error": "삭제할 메모를 찾을 수 없습니다."}), 404 # 사용자가 없음
+
+        if memo_id not in user_memory_storage[requester_uid]:
+            print(f"⚠️ 삭제 요청 실패: 사용자 (UID: {requester_uid})에게 해당 메모 (ID: {memo_id}) 없음.")
+            return jsonify({"error": "삭제할 메모를 찾을 수 없습니다."}), 404 # 메모가 없음
+
+        # (선택적) 삭제하려는 것이 정말 'memo' 타입인지 확인
+        item_to_delete = user_memory_storage[requester_uid].get(memo_id)
+        if not isinstance(item_to_delete, dict) or item_to_delete.get('type') != 'memo':
+            print(f"🚨 삭제 요청 거부: 대상(ID: {memo_id})이 메모 타입이 아님 (Type: {item_to_delete.get('type')}).")
+            return jsonify({"error": "잘못된 요청입니다. 메모만 삭제할 수 있습니다."}), 403 # Forbidden
+
+        # --- 메모 삭제 ---
+        del user_memory_storage[requester_uid][memo_id]
+        print(f"✅ 메모 삭제 완료 (UID: {requester_uid}, Memo ID: {memo_id})")
+
+        # (선택적) 사용자 폴더가 비었으면 삭제
+        if not user_memory_storage[requester_uid]:
+             try:
+                 del user_memory_storage[requester_uid]
+                 print(f"🧹 메모 삭제 후 빈 사용자 폴더 삭제됨 (UID: {requester_uid})")
+             except KeyError:
+                  pass # 이미 삭제되었을 수 있음
+
+        return jsonify({"message": "메모가 성공적으로 삭제되었습니다."}), 200 # 또는 204 No Content
+
+    except Exception as e:
+        print(f"🚨 '/api/calendar/memos/{memo_id}' [DELETE] 메모 삭제 중 예외 발생: {e}")
+        traceback.print_exc()
+        # 롤백은 필요 없음 (삭제 작업이므로)
+        return jsonify({"error": "메모 삭제 중 서버 오류 발생", "detail": str(e)}), 500
+
+
+print("--- [API Routes] Routes defined (including calendar memo APIs) ---")

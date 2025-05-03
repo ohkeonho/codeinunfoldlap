@@ -576,229 +576,366 @@ document.addEventListener('DOMContentLoaded', () => {
 
 }); // === End DOMContentLoaded ===
 
+// 전역 또는 접근 가능한 스코프에 캘린더 인스턴스 변수 선언
+let miniCalendar = null;
+// isFirebaseInitialized, firebase 객체, closeAdminModal 함수 등은
+// 이 스크립트의 다른 부분이나 전역 스코프에서 사용 가능해야 합니다.
+// (예: let isFirebaseInitialized = false; 스크립트 상단에 추가)
+
+// === Helper 함수: 서버에 메모 추가 ===
+async function addMemoToServer(dateStr, text) {
+    if (typeof isFirebaseInitialized === 'undefined' || !isFirebaseInitialized || typeof firebase === 'undefined' || !firebase.auth().currentUser) {
+        throw new Error("로그인 및 Firebase 초기화가 필요합니다.");
+    }
+    const idToken = await firebase.auth().currentUser.getIdToken(true); // Force refresh token
+    const response = await fetch('/api/calendar/memos', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr, text: text })
+    });
+    if (!response.ok) { const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status} 오류` })); throw new Error(errorData.error || `메모 저장 실패 (${response.status})`); }
+    return await response.json();
+}
+
+// === Helper 함수: 서버에서 메모 삭제 ===
+async function deleteMemoFromServer(memoId) {
+    if (typeof isFirebaseInitialized === 'undefined' || !isFirebaseInitialized || typeof firebase === 'undefined' || !firebase.auth().currentUser) { throw new Error("로그인 및 Firebase 초기화가 필요합니다."); }
+    const idToken = await firebase.auth().currentUser.getIdToken(true); // Force refresh token
+    const response = await fetch(`/api/calendar/memos/${encodeURIComponent(memoId)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${idToken}` }
+    });
+    if (!response.ok) { const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status} 오류` })); throw new Error(errorData.error || `메모 삭제 실패 (${response.status})`); }
+    return await response.json();
+}
+
+// === 오늘 날짜 문자열 (YYYY-MM-DD) 반환 함수 ===
+function getTodayDateString() {
+    const today = new Date();
+    const year = today.getFullYear(); // 'yyyy'가 아니라 'year'로 변수 선언됨
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    // ▼▼▼ 오타 수정 ▼▼▼
+    return `${year}-${month}-${day}`; // 'yyyy' 대신 'year' 사용
+}
+
+// === 특정 날짜의 메모 로드 및 표시 함수 ===
+async function loadAndDisplayMemosForDate(dateStr) {
+    const displayArea = document.getElementById('today-memo-display');
+    const statusDiv = document.getElementById('memo-status');
+    if (!displayArea) { console.error("Memo display area not found."); return; }
+
+    displayArea.innerHTML = '<p>메모 로딩 중...</p>';
+    if(statusDiv) { statusDiv.textContent = ''; statusDiv.className=''; }
+
+    try {
+        if (typeof firebase === 'undefined' || !firebase.auth().currentUser) { throw new Error("로그인이 필요합니다."); }
+        const idToken = await firebase.auth().currentUser.getIdToken(true);
+        const response = await fetch('/api/calendar/memos', { method: 'GET', headers: { 'Authorization': `Bearer ${idToken}` } });
+        if (!response.ok) {
+             let errorMsg = `메모 로딩 실패 (${response.status})`;
+             try { const errData = await response.json(); errorMsg = errData.error || errData.detail || errorMsg; } catch(e) {}
+             throw new Error(errorMsg);
+         }
+        const allMemos = await response.json();
+        const memosForDate = allMemos.filter(memo => memo.start === dateStr);
+
+        displayArea.innerHTML = '';
+        if (memosForDate.length === 0) {
+            displayArea.innerHTML = '<p>해당 날짜의 메모가 없습니다.</p>';
+        } else {
+            memosForDate.forEach(memo => {
+                const memoP = document.createElement('p');
+                const memoTextSpan = document.createElement('span');
+                memoTextSpan.textContent = memo.title || "[내용 없음]";
+                memoP.appendChild(memoTextSpan);
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '<i class="fas fa-times"></i>';
+                deleteBtn.classList.add('delete-memo-btn');
+                deleteBtn.title = "메모 삭제";
+                deleteBtn.dataset.memoId = memo.id;
+
+                deleteBtn.addEventListener('click', async (e) => {
+                    const memoIdToDelete = e.currentTarget.dataset.memoId;
+                    if (confirm(`"${memo.title || '이 메모'}"를 삭제하시겠습니까?`)) {
+                        try {
+                            if(statusDiv) { statusDiv.textContent = "삭제 중..."; statusDiv.className=''; }
+                            await deleteMemoFromServer(memoIdToDelete);
+                            if(statusDiv) { statusDiv.textContent = "메모가 삭제되었습니다."; statusDiv.className='success'; }
+                            loadAndDisplayMemosForDate(dateStr); // 목록 새로고침
+                            if (miniCalendar) miniCalendar.refetchEvents(); // 캘린더 점 업데이트
+                            setTimeout(()=> { if(statusDiv) { statusDiv.textContent = ''; statusDiv.className=''; } }, 2000);
+                        } catch (error) {
+                            console.error("Memo delete failed:", error);
+                            if(statusDiv) { statusDiv.textContent = `삭제 오류: ${error.message}`; statusDiv.className='error'; }
+                        }
+                    }
+                });
+                memoP.appendChild(deleteBtn);
+                displayArea.appendChild(memoP);
+            });
+        }
+    } catch (error) {
+        console.error("Error loading memos for date:", dateStr, error);
+        displayArea.innerHTML = `<p style="color: red;">메모 로딩 중 오류 발생</p>`;
+    }
+}
+
+
+// === DOM 로드 후 실행될 메인 로직 (캘린더 부분) ===
 document.addEventListener('DOMContentLoaded', function() {
+    // === 캘린더 및 메모 관련 요소 가져오기 ===
     const miniCalendarEl = document.getElementById('mini-calendar');
-    const modalCalendarEl = document.getElementById('fullcalendar-modal');
-    const calendarModal = document.getElementById('calendarModal');
+    const memoInputArea = document.getElementById('memo-input-area');
+    const memoSelectedDateSpan = document.getElementById('memo-selected-date');
+    const memoTextInput = document.getElementById('memo-text-input');
+    const saveMemoBtn = document.getElementById('save-memo-btn');
+    const cancelMemoBtn = document.getElementById('cancel-memo-btn');
+    const memoStatusDiv = document.getElementById('memo-status');
+    const refreshMemosBtn = document.getElementById('refresh-memos-btn');
     const modalBackdrop = document.getElementById('modalBackdrop');
-    const closeCalendarModalBtn = document.getElementById('closeCalendarModal');
 
     // --- 미니 캘린더 초기화 ---
-    if (miniCalendarEl) {
+    if (miniCalendarEl && memoInputArea && memoSelectedDateSpan && memoTextInput && saveMemoBtn && cancelMemoBtn && memoStatusDiv && refreshMemosBtn) {
+
         miniCalendar = new FullCalendar.Calendar(miniCalendarEl, {
-            initialView: 'dayGridMonth', // 월간 뷰
-            locale: 'ko', // 한국어
-            headerToolbar: { // 툴바 설정 (간소화)
-                left: 'prev,next',
-                center: 'title',
-                right: '' // 버튼 숨김
-            },
-            events: '/api/events', // 이벤트 소스 (Flask 백엔드에서 제공해야 함)
-            height: 'auto', // 높이 자동 조절 (작은 크기에 맞게)
-            contentHeight: 'auto', // 콘텐츠 높이 자동 조절
-            aspectRatio: 1.2, // 너비/높이 비율 조정 (작은 캘린더에 적합)
-            eventDisplay: 'none', // 미니 캘린더에서는 이벤트 표시 안 함 (선택 사항)
-                                 // 'list-item' 등으로 설정하여 간단히 표시 가능
+            initialView: 'dayGridMonth', locale: 'ko', headerToolbar: {left:'prev,next', center:'title', right:''}, height:'auto', contentHeight:'auto', aspectRatio:1.2,
 
-            // 미니 캘린더 날짜 또는 배경 클릭 시 모달 열기
+            // --- 이벤트 로드: 'events' 함수 (인증 헤더 추가) ---
+            events: async function(fetchInfo, successCallback, failureCallback) {
+                console.log("[MiniCal Events] Fetching events...");
+                const currentUser = firebase.auth().currentUser;
+                if (!currentUser) { successCallback([]); return; }
+                try {
+                    const idToken = await currentUser.getIdToken(true);
+                    if (!idToken) throw new Error("Token is null");
+                    const fetchUrl = `/api/calendar/memos?start=${fetchInfo.start.toISOString()}&end=${fetchInfo.end.toISOString()}`;
+                    const response = await fetch(fetchUrl, { method: 'GET', headers: { 'Authorization': `Bearer ${idToken}` } });
+                    if (!response.ok) throw new Error(`Server Error (${response.status})`);
+                    const eventsArray = await response.json();
+                    successCallback(eventsArray);
+                } catch (error) {
+                    console.error("[MiniCal Events] Fetch/Token Error:", error);
+                    failureCallback(error);
+                }
+            },
+
+            // --- 이벤트 점 표시 ---
+            eventDidMount: function(info) {
+                const dot = document.createElement('span');
+                dot.style.cssText = 'background-color: #ff9f89; border-radius: 50%; width: 6px; height: 6px; display: inline-block; margin-left: 4px; vertical-align: middle;';
+                const dayNumberEl = info.el.closest('.fc-daygrid-day')?.querySelector('.fc-daygrid-day-number');
+                if (dayNumberEl && !dayNumberEl.querySelector('.memo-dot')) { dot.classList.add('memo-dot'); dayNumberEl.appendChild(dot); }
+                info.el.style.display = 'none';
+            },
+
+            // --- 날짜 클릭: 해당 날짜 메모 로드 및 표시 ---
             dateClick: function(info) {
-                 // 클릭한 날짜 정보를 가지고 모달 열기
-                 openCalendarModal(info.date);
+                console.log('Mini calendar date clicked:', info.dateStr);
+                if (memoInputArea && memoSelectedDateSpan && memoTextInput && memoStatusDiv) {
+                    memoSelectedDateSpan.textContent = info.dateStr;
+                    memoInputArea.dataset.selectedDate = info.dateStr;
+                    memoTextInput.value = '';
+                    memoStatusDiv.textContent = ''; memoStatusDiv.className = '';
+                    if(typeof loadAndDisplayMemosForDate === 'function') {
+                        loadAndDisplayMemosForDate(info.dateStr);
+                    }
+                    memoInputArea.style.display = 'block';
+                } else { console.error("Memo input elements missing on dateClick."); }
             },
-             // 툴바 포함 미니 캘린더 영역 전체 클릭 시 모달 열기 (dateClick과 함께 사용 시 클릭 범위가 넓어짐)
-            /*
-             DidMount: function(info) {
-                 info.el.addEventListener('click', function(event) {
-                     // 이벤트 버블링 방지 (필요시)
-                     // event.stopPropagation();
-                     // dateClick 이벤트와 중복될 수 있으니 주의하여 사용
-                     if (!event.target.closest('.fc-daygrid-day-number') && !event.target.closest('.fc-button')) {
-                          // 날짜 숫자나 버튼 클릭이 아닌 경우에만 모달 열기
-                           openCalendarModal(miniCalendar.getDate()); // 현재 미니 달력의 날짜로 열기
-                     }
-                 });
+        });
+        // --- render() 호출은 Auth 상태 변경 시 ---
+        console.log("FullCalendar instance created.");
+
+        // --- 메모 저장 버튼 이벤트 리스너 (주석 해제 및 전체 코드 포함) ---
+        saveMemoBtn.addEventListener('click', async () => {
+            const dateStr = memoInputArea.dataset.selectedDate; // 선택된 날짜 가져오기
+            const text = memoTextInput.value.trim(); // 입력된 메모 내용 가져오기
+
+            // 입력 유효성 검사
+            if (!dateStr) {
+                 memoStatusDiv.textContent = "날짜가 선택되지 않았습니다.";
+                 memoStatusDiv.className = 'error';
+                 return;
             }
-            */
-        });
-        miniCalendar.render(); // 미니 캘린더 바로 렌더링
-    } else {
-        console.error("Mini calendar container element not found!");
-    }
-
-    // --- 큰 캘린더 (모달용) 초기화 ---
-    if (modalCalendarEl) {
-         modalCalendar = new FullCalendar.Calendar(modalCalendarEl, {
-            initialView: 'dayGridMonth', // 기본 뷰
-            locale: 'ko', // 한국어
-             headerToolbar: { // 큰 달력에는 전체 툴바 표시
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth,timeGridWeek,timeGridDay' // 뷰 전환 버튼
-            },
-            events: '/api/events', // 동일한 이벤트 소스 사용
-            editable: true, // 이벤트 드래그, 리사이즈 등 편집 가능 여부 (필요 시)
-            selectable: true, // 날짜/시간 범위 선택 가능 여부 (필요 시)
-            height: 'auto', // 모달 높이에 맞게 자동 조절
-            // aspectratio: 1.8, // 너비/높이 비율 조절
-
-            // 이벤트 클릭 시 상세 정보 표시 (이전 예시 참고)
-             eventClick: function(info) {
-                 console.log('Event clicked:', info.event);
-                 // alert('Event: ' + info.event.title + '\nStarts: ' + info.event.start.toLocaleString());
-                 // 여기에 이벤트 상세 정보를 보여주는 모달이나 패널을 띄우는 로직 구현
-             },
-              // 날짜 선택 시 이벤트 추가 등 (필요 시)
-            select: function(info) {
-                console.log('Date range selected:', info.startStr, info.endStr, info.allDay);
-                // const eventTitle = prompt('새 이벤트 제목:');
-                // if (eventTitle) {
-                //     // FullCalendar에 이벤트 임시 추가
-                //     modalCalendar.addEvent({
-                //         title: eventTitle,
-                //         start: info.startStr,
-                //         end: info.endStr, // FullCalendar는 끝 날짜/시간 포함
-                //         allDay: info.allDay
-                //     });
-                //     // TODO: 이벤트를 백엔드에 저장하는 API 호출 필요
-                // }
-            },
-            // 이벤트 드래그/리사이즈 후 업데이트 (editable: true 시)
-             eventDrop: function(info) {
-                 console.log('Event dropped:', info.event);
-                 // TODO: 백엔드에 이벤트 시간/날짜 변경 API 호출 필요
-             },
-             eventResize: function(info) {
-                 console.log('Event resized:', info.event);
-                 // TODO: 백엔드에 이벤트 시간/날짜 변경 API 호출 필요
-             },
-
-             // 캘린더 뷰 변경 시 (예: 월 -> 주로 이동)
-             viewDidMount: function(info) {
-                 console.log('View changed to:', info.view.type);
-                 // 필요하다면 뷰 변경 시 추가 로직 수행
-             }
-        });
-        // modalCalendar.render(); // !! 모달이 열릴 때 렌더링하므로 여기서 바로 호출하지 않음
-    } else {
-         console.error("Modal calendar container element not found!");
-    }
-
-    // --- 모달 열기/닫기 함수 및 이벤트 핸들러 ---
-
-    // 모달 열기 함수
-    function openCalendarModal(initialDate = null) {
-        // 모달과 백드롭 표시
-        calendarModal.style.display = 'block';
-        modalBackdrop.style.display = 'block';
-        // 필요시 애니메이션 클래스 추가
-        // calendarModal.classList.add('is-visible');
-        // modalBackdrop.classList.add('is-visible');
-
-
-        // 모달이 열릴 때 큰 달력 렌더링 또는 크기 업데이트
-        if (modalCalendar) {
-             // 중요: 모달이 보이게 된 후에 렌더링 또는 updateSize 호출
-             if (!modalCalendar.el.hasChildNodes() || modalCalendar.getEvents().length === 0) {
-                 // 처음 렌더링되거나 이벤트가 없는 경우 render() (필요시)
-                 // 보통은 updateSize() 만으로 충분
-                 // modalCalendar.render(); // 일반적으로 필요 없음
-                  modalCalendar.updateSize(); // 필수: 모달 크기에 맞춰 캘린더 크기 조정
-             } else {
-                 // 이미 렌더링되었다면 크기만 업데이트
-                 modalCalendar.updateSize(); // 필수
-             }
-
-            // 초기 날짜가 지정되었다면 해당 날짜로 이동
-            if (initialDate) {
-                modalCalendar.gotoDate(initialDate);
-            } else if (miniCalendar) {
-                // 초기 날짜가 없으면 미니 캘린더의 현재 뷰 날짜로 이동
-                 modalCalendar.gotoDate(miniCalendar.getDate());
+            if (!text) {
+                 memoStatusDiv.textContent = "메모 내용을 입력하세요.";
+                 memoStatusDiv.className = 'error';
+                 memoTextInput.focus(); // 입력 필드에 포커스
+                 return;
             }
 
-            // 이벤트 데이터 새로고침 (필요시)
-            // modalCalendar.refetchEvents();
-        }
-    }
+            // 버튼 비활성화 및 상태 업데이트
+            saveMemoBtn.disabled = true;
+            cancelMemoBtn.disabled = true;
+            memoStatusDiv.textContent = "저장 중...";
+            memoStatusDiv.className = '';
 
-    // 모달 닫기 함수
-    function closeCalendarModal() {
-        // 모달과 백드롭 숨김
-        calendarModal.style.display = 'none';
-        modalBackdrop.style.display = 'none';
-         // 필요시 애니메이션 클래스 제거 또는 hidden 클래스 추가
-        // calendarModal.classList.remove('is-visible');
-        // modalBackdrop.classList.remove('is-visible');
-        // calendarModal.classList.add('is-hidden'); // 애니메이션용
-        // modalBackdrop.classList.add('is-hidden'); // 애니메이션용
+            try {
+                // 서버에 메모 추가 요청 (Helper 함수 사용)
+                await addMemoToServer(dateStr, text);
+                memoStatusDiv.textContent = "메모가 저장되었습니다.";
+                memoStatusDiv.className = 'success';
 
-        // FullCalendar 인스턴스는 메모리에 유지
-        // 모달 닫을 때마다 완전히 파괴하고 싶다면 modalCalendar.destroy(); 호출 후
-        // 열 때 새로 new FullCalendar.Calendar(...) 해야 함. 일반적으로 유지하는 것이 효율적.
-    }
+                // 성공 시 입력 필드 비우고, 목록 및 캘린더 새로고침
+                memoTextInput.value = ''; // 입력 필드 비우기
+                if (typeof loadAndDisplayMemosForDate === 'function') {
+                    loadAndDisplayMemosForDate(dateStr); // 현재 날짜 메모 목록 새로고침
+                }
+                if (miniCalendar) {
+                    miniCalendar.refetchEvents(); // 캘린더의 점 표시 업데이트
+                }
 
-    // 닫기 버튼 클릭 이벤트
-    if (closeCalendarModalBtn) {
-        closeCalendarModalBtn.addEventListener('click', closeCalendarModal);
-    }
+                // 성공 메시지 잠시 후 지우기
+                setTimeout(() => {
+                    if(memoStatusDiv) { memoStatusDiv.textContent = ''; memoStatusDiv.className = ''; }
+                }, 2000);
 
-    // 모달 백드롭 클릭 시 닫기
+            } catch (error) {
+                // 오류 발생 시 처리
+                console.error("Memo save failed:", error);
+                if(memoStatusDiv) {
+                    memoStatusDiv.textContent = `오류: ${error.message}`;
+                    memoStatusDiv.className = 'error';
+                }
+            } finally {
+                // 버튼 다시 활성화
+                 saveMemoBtn.disabled = false;
+                 cancelMemoBtn.disabled = false;
+            }
+        }); // saveMemoBtn 리스너 끝
+
+        // --- 메모 취소 버튼 이벤트 리스너 ---
+        cancelMemoBtn.addEventListener('click', () => {
+             memoTextInput.value = ''; // 입력 필드만 비우기
+             // 영역을 숨기거나 오늘 날짜로 되돌리지 않음 (현재 선택된 날짜 유지)
+        });
+
+        // --- 새로고침 버튼 리스너 ---
+        refreshMemosBtn.addEventListener('click', () => {
+            const currentDate = memoInputArea.dataset.selectedDate || getTodayDateString();
+            console.log(`Refreshing memos for date: ${currentDate}`);
+            if(typeof loadAndDisplayMemosForDate === 'function') {
+                loadAndDisplayMemosForDate(currentDate); // 현재 날짜 메모 새로고침
+            }
+            if (miniCalendar) {
+                miniCalendar.refetchEvents(); // 캘린더 점 새로고침
+            }
+        });
+
+    } else { console.error("Calendar initialization skipped: Required elements missing."); }
+
+    // --- 백드롭 클릭 리스너 (다른 모달용 - 캘린더 로직 없음) ---
     if (modalBackdrop) {
         modalBackdrop.addEventListener('click', function(event) {
-            // 백드롭 자체가 클릭되었는지 확인 (모달 콘텐츠 내부 클릭 무시)
-             // calendarModal이 현재 표시되어 있는지 확인
-            if (event.target === modalBackdrop && calendarModal.style.display === 'block') {
-                 // 상세 업로드 모달 등 다른 모달과 백드롭을 공유하는 경우
-                 // 어떤 모달이 열려있는지 확인하는 로직 추가 필요
-                 // 예: if (calendarModal.style.display === 'block') closeCalendarModal();
-                 // else if (adminUploadModal.style.display === 'block') closeAdminModal();
-                 closeCalendarModal(); // 현재는 캘린더 모달만 닫도록 처리
+            const adminModal = document.getElementById('adminUploadModal');
+            if (event.target === modalBackdrop && adminModal && adminModal.style.display === 'block') {
+                if (typeof closeAdminModal === 'function') {
+                   closeAdminModal();
+                }
             }
         });
     }
 
-    // 미니 캘린더 컨테이너 자체 클릭 시 모달 열기
-    // dateClick 이벤트와 함께 사용하면 클릭 범위가 넓어집니다.
-    // 특정 영역(예: 제목) 클릭 시만 열고 싶다면 해당 요소에 이벤트 리스너 추가
-    if (miniCalendarEl) {
-         miniCalendarEl.addEventListener('click', function(event) {
-             // FullCalendar의 내부 클릭 이벤트(dateClick, button click 등)와의 충돌 방지
-             // 이벤트가 이미 FullCalendar 내부에서 처리되었으면 모달 열지 않음
-             // (예: 날짜 셀 클릭이나 버튼 클릭 시 dateClick 이벤트가 먼저 발생)
-             // 만약 dateClick 이벤트에서 모달을 열고 있다면 이 부분은 제거하거나 조건을 더 구체적으로 작성
-             // 여기서는 dateClick에서 모달을 열도록 하므로, 이 리스너는 제거하거나 주석 처리하는 것이 좋습니다.
-             // openCalendarModal(miniCalendar.getDate());
-              // console.log("Mini calendar element clicked, opening modal");
-         });
-    }
-
-    // --- 기타 페이지 초기화 로직 ---
-    // 예: 테이블 데이터 로드 함수 호출
-    // fetchMembers();
-});
+}); // === End DOMContentLoaded ===
 // === Firebase Auth 상태 변경 리스너 ===
+// === Firebase Auth 상태 변경 리스너 (캘린더 로직 추가) ===
 if (typeof firebase !== 'undefined') {
     firebase.auth().onAuthStateChanged(user => {
         console.log("Auth State Changed. User:", user ? user.email : null);
         const memberListBody = document.getElementById('member-list-body'); // 관리자 페이지 식별
 
-        isFirebaseInitialized = true; // 리스너 실행 시 초기화 완료 간주
+        // --- ▼▼▼ 메모 관련 DOM 요소 가져오기 (리스너 내에서) ▼▼▼ ---
+        const memoInputArea = document.getElementById('memo-input-area');
+        const memoSelectedDateSpan = document.getElementById('memo-selected-date');
+        // --- ▲▲▲ 메모 관련 DOM 요소 가져오기 끝 ▲▲▲ ---
+
+        // isFirebaseInitialized = true; // 필요 시 주석 해제 또는 다른 곳에서 관리
 
         if (user) { // 로그인 상태
+            // --- ▼▼▼ 캘린더 렌더링/새로고침 로직 (기존 유지) ▼▼▼ ---
+            if (typeof miniCalendar !== 'undefined' && miniCalendar) {
+                console.log("[Auth State] User logged in. Attempting to render/refetch miniCalendar.");
+                try {
+                    miniCalendar.render();
+                    miniCalendar.refetchEvents();
+                } catch (error) {
+                    console.error("[Auth State] Error during miniCalendar render/refetch:", error);
+                }
+            } else {
+                if (typeof miniCalendar === 'undefined') { console.error("[Auth State] miniCalendar variable is not defined."); }
+                else { console.warn("[Auth State] miniCalendar instance is null on login."); }
+            }
+            // --- ▲▲▲ 캘린더 로직 끝 ▲▲▲ ---
+
+            // --- ▼▼▼ 오늘 날짜 설정 및 메모 로드 로직 추가 ▼▼▼ ---
+            if (memoInputArea && memoSelectedDateSpan) { // 관련 요소들이 있는지 확인
+                try {
+                    const today = getTodayDateString(); // 오늘 날짜 계산 (YYYY-MM-DD)
+                    console.log("[Auth State] Setting default date to:", today);
+
+                    memoSelectedDateSpan.textContent = today; // ★ 헤더의 날짜 업데이트 ★
+                    memoInputArea.dataset.selectedDate = today; // 내부적으로 날짜 저장
+                    memoInputArea.style.display = 'block';      // 메모 영역 표시 확인
+
+                    // 오늘 날짜의 메모 로드 함수 호출 (loadAndDisplayMemosForDate 함수는 정의되어 있어야 함)
+                    if (typeof loadAndDisplayMemosForDate === 'function') {
+                        console.log("[Auth State] Calling loadAndDisplayMemosForDate for today.");
+                        loadAndDisplayMemosForDate(today);
+                    } else {
+                        console.error("[Auth State] loadAndDisplayMemosForDate function is not defined.");
+                    }
+                } catch (e) {
+                    console.error("[Auth State] Error setting today's date or loading memos:", e);
+                }
+            } else {
+                console.error("[Auth State] Cannot set today's date. Memo area elements not found.");
+            }
+            // --- ▲▲▲ 오늘 날짜/메모 로직 추가 완료 ▲▲▲ ---
+
+            // --- 기존 로직 유지 (관리자 페이지 테이블 로드 등) ---
             if (memberListBody) { // 관리자 페이지
                 console.log("User logged in on Admin page. Calling loadSummaries().");
-                loadSummaries(user);
+                if (typeof loadSummaries === 'function') {
+                    loadSummaries(user);
+                } else {
+                    console.error("loadSummaries function is not defined.");
+                }
             } else { // 다른 페이지
                 console.log("User logged in, not on Admin page.");
             }
+            // --- 기존 로직 끝 ---
+
         } else { // 로그아웃 상태
-             if (memberListBody) { // 관리자 페이지
-                 console.log("User logged out on Admin page.");
-                 memberListBody.innerHTML = `<tr><td colspan="6" style="text-align: center;">로그인이 필요합니다.</td></tr>`; // Colspan 수정
-             } else { // 다른 페이지
-                 console.log("User logged out, not on Admin page.");
+             // --- ▼▼▼ 캘린더 이벤트 제거 로직 (기존 유지) ▼▼▼ ---
+             if (typeof miniCalendar !== 'undefined' && miniCalendar) {
+                 if (miniCalendar.el && miniCalendar.el.classList.contains('fc-rendered')) {
+                     console.log("[Auth State] User logged out. Removing events from miniCalendar.");
+                     miniCalendar.removeAllEvents();
+                 }
              }
-             currentAdminToken = null; // 토큰 초기화
+             // --- ▲▲▲ 캘린더 로직 끝 ▲▲▲ ---
+
+             // --- ▼▼▼ 로그아웃 시 메모 영역 숨기기 추가 ▼▼▼ ---
+             if (memoInputArea) { // 메모 영역 요소가 있으면 숨김
+                 memoInputArea.style.display = 'none';
+                 console.log("[Auth State] Memo area hidden on logout.");
+             }
+             // --- ▲▲▲ 숨기기 로직 추가 완료 ▲▲▲ ---
+
+            // --- 기존 로직 유지 (테이블 비우기, 토큰 초기화 등) ---
+            if (memberListBody) { // 관리자 페이지
+                console.log("User logged out on Admin page.");
+                memberListBody.innerHTML = `<tr><td colspan="6" style="text-align: center;">로그인이 필요합니다.</td></tr>`;
+            } else { // 다른 페이지
+                console.log("User logged out, not on Admin page.");
+            }
+            if (typeof currentAdminToken !== 'undefined') {
+                 currentAdminToken = null;
+            }
+            // --- 기존 로직 끝 ---
         }
     });
-} else { console.error("Firebase object not found for Auth listener."); }
+} else {
+    console.error("Firebase object not found for Auth listener.");
+}
