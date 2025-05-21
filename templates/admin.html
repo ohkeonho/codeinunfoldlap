@@ -121,10 +121,39 @@
              <label for="modalDocumentFile">참고 문서 (PDF, JPG 등):</label> <input type="file" id="modalDocumentFile" name="referenceFiles" multiple accept=".jpg,.jpeg,.png,.bmp,.tiff,.PDF"> <label for="modalKeySelect">주요 검토 사항:</label>
              <select id="modalKeySelect" required>
                  <option value="" disabled selected>-- 키워드 선택 --</option>
-                 <option value="고소장">고소장</option>
-                 <option value="보충이유서">보충이유서</option>
-                 <option value="검찰의견서">검찰의견서</option>
-                 <option value="합의서">합의서</option>
+                 <optgroup label="형사">
+                     <option value="고소장">고소장</option>
+                     <option value="보충이유서">보충이유서</option>
+                     <option value="검찰의견서">검찰의견서</option>
+                     <option value="합의서">합의서</option>
+                     <option value="처벌불원서">처벌불원서</option>
+                     <option value="약식명령 의견서">약식명령 의견서</option>
+                     <option value="불기소처분 이의신청서">불기소처분 이의신청서</option>
+                     <option value="기소유예의견서">기소유예의견서</option>
+                     <option value="변호인 의견서 (공판 준비)">변호인 의견서 (공판 준비)</option>
+                     <option value="최종 변론서">최종 변론서</option>
+                     <option value="항소이유서">항소이유서</option>
+                     <option value="상고이유서">상고이유서</option>
+                 </optgroup>
+                 <optgroup label="민사">
+                     <option value="내용증명">내용증명</option>
+                     <option value="조정신청서(소 제기 전)">조정신청서(소 제기 전)</option>
+                     <option value="소장">소장</option>
+                     <option value="청구취지 및 청구원인 작성">청구취지 및 청구원인 작성</option>
+                     <option value="답변서(피고)">답변서(피고)</option>
+                     <option value="반소장">반소장</option>
+                     <option value="변론준비서면">변론준비서면</option>
+                     <option value="조정신청서">조정신청서</option>
+                     <option value="합의서">합의서</option>
+                     <option value="조정조서">조정조서</option>
+                     <option value="항소이유서">항소이유서</option>
+                     <option value="상고이유서">상고이유서</option>
+                     <option value="집행문 부여 신청서">집행문 부여 신청서</option>
+                     <option value="강제집행 신청서">강제집행 신청서</option>
+                     <option value="채권압류 및 추심명령 신청서">채권압류 및 추심명령 신청서</option>
+                     <option value="부동산 강제경매 신청서">부동산 강제경매 신청서</option>
+                 </optgroup>
+             </select>
              </select>
              <button id="confirmUploadBtn">업로드 및 분석 시작</button> <div id="adminUploadStatus"></div>
         </div>
